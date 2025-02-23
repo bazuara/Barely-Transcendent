@@ -15,7 +15,8 @@
                 "sdras.night-owl",
                 "ms-python.pylint",
                 "ms-python.autopep8",
-                "batisteo.vscode-django"
+                "batisteo.vscode-django",
+                "monosans.djlint"
             ],
             "settings": {
                 "workbench.colorTheme": "Night Owl",
@@ -27,7 +28,22 @@
                 "python.linting.pylintArgs": [
                     "--load-plugins",
                     "pylint_django"
-                ]
+                ],
+                "emmet.includeLanguages": {
+                    "html": "html",
+                    "django-html": "html",
+                    "xdmx": "html"
+                },
+                "files.associations": {
+                    "**/*.html": "html",
+                    "**/templates/**/*.html": "django-html",
+                    "**/templates/**/*": "django-txt",
+                    "**/requirements{/**,*}.{txt,in}": "pip-requirements"
+                },
+                "[django-html][jinja][jinja-html][twig]": {
+                    "editor.defaultFormatter": "monosans.djlint",
+                    "editor.formatOnSave": true
+                }
             }
         }
     }
