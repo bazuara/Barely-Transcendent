@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SPA with Django & htmx</title>
+        {% load bootstrap5 %}
+        {% bootstrap_css %}
+        {% bootstrap_javascript %}
+        <script src="https://unpkg.com/htmx.org"></script>
+    </head>
+    <body>
+        <!-- Cargar el Header desde un partial -->
+        {% include "partials/header.html" %}
+        <!-- Contenido dinámico -->
+        <main id="content" class="container my-4">
+            {% block content %}
+            {% endblock content %}
+        </main>
+        <!-- Cargar el Footer desde un partial -->
+        {% include "partials/footer.html" %}
+        <!-- Spinner de carga -->
+        <div id="loading"
+             class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center">
+            <div class="spinner-border text-light" role="status"></div>
+        </div>
+        <script>
+        document.body.addEventListener('htmx:beforeRequest', function() {
+            document.getElementById("loading").classList.remove("d-none");
+        });
+
+        document.body.addEventListener('htmx:afterRequest', function() {
+            document.getElementById("loading").classList.add("d-none");
+        });
+        </script>
+    </body>
+</html>
