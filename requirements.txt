@@ -2,6 +2,8 @@ asgiref==3.8.1
 astroid==3.3.8
 autopep8==2.3.2
 beautifulsoup4==4.13.3
+certifi==2025.1.31
+charset-normalizer==3.4.1
 click==8.1.8
 colorama==0.4.6
 cssbeautifier==1.15.3
@@ -11,6 +13,7 @@ django-bootstrap-v5==1.0.11
 django-htmx==1.22.0
 djlint==1.36.4
 EditorConfig==0.17.0
+idna==3.10
 isort==6.0.0
 jsbeautifier==1.15.3
 json5==0.10.0
@@ -22,9 +25,11 @@ pycodestyle==2.12.1
 pylint==3.3.4
 PyYAML==6.0.2
 regex==2024.11.6
+requests==2.32.3
 six==1.17.0
 soupsieve==2.6
 sqlparse==0.5.3
 tomlkit==0.13.2
 tqdm==4.67.1
 typing_extensions==4.12.2
+urllib3==2.3.0
