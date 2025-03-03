@@ -4,7 +4,7 @@
            href="{% url 'home' %}"
            hx-get="{% url 'home' %}"
            hx-target="#content"
-           hx-push-url="true">Barely Transcendent SPA</a>
+           hx-push-url="true">Barely Transcendent</a>
         <button class="navbar-toggler"
                 type="button"
                 data-bs-toggle="collapse"
@@ -13,6 +13,7 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
+                {% if request.session.user_id %}
                 <li class="nav-item">
                     <a class="nav-link"
                        href="{% url 'home' %}"
@@ -27,6 +28,28 @@
                        hx-target="#content"
                        hx-push-url="true">About</a>
                 </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle d-flex align-items-center" 
+                    href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if user.intra_picture %}
+                        <img src="{{ user.intra_picture }}" alt="{{ user.intra_login }}" 
+                        class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
+                        {% endif %}
+                        <span>{{ user.intra_login }}</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li>
+                            <a class="dropdown-item" 
+                               href="{% url 'profile' %}"
+                               hx-get="{% url 'profile' %}"
+                               hx-target="#content"
+                               hx-push-url="true">Perfil</a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'logout' %}">Cerrar sesión</a></li>
+                    </ul>
+                </li>
+                {% endif %}
             </ul>
         </div>
     </div>

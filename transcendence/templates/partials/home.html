@@ -1,4 +1,37 @@
-<div>
-    <h2 class="text-2xl font-bold">Página de Inicio</h2>
-    <p>Bienvenido a la aplicación Django con htmx.</p>
+<div class="container py-5">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4">Bienvenido, {{ user.intra_login }}!</h1>
+            <p class="lead text-muted">¿A qué quieres jugar hoy?</p>
+        </div>
+    </div>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">Pong</h3>
+                    <p class="card-text">El clásico juego de Pong. ¡Demuestra tus habilidades!</p>
+                    <a href="#" class="btn btn-primary btn-lg">Jugar Pong</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">Piedra, Papel o Tijera</h3>
+                    <p class="card-text">¿Confías en tu suerte? ¡Prueba tu estrategia!</p>
+                    <a href="#" class="btn btn-success btn-lg">Jugar Piedra, Papel o Tijera</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <h4>Top 10 Jugadores</h4>
+            <p>Próximamente...</p>
+        </div>
+    </div>
 </div>

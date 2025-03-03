@@ -27,6 +27,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# 42 OAuth Settings
+OAUTH_42_CLIENT_ID = 'u-s4t2ud-254f5f29fbea7b7489f9a2b1a17fb2b605f2c7999426345b76aa3b17c9427855'
+OAUTH_42_CLIENT_SECRET = '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'
+OAUTH_42_REDIRECT_URI = 'http://127.0.0.1:8000/oauth/callback'
+OAUTH_42_AUTHORIZATION_URL = 'https://api.intra.42.fr/oauth/authorize'
+OAUTH_42_TOKEN_URL = 'https://api.intra.42.fr/oauth/token'
+OAUTH_42_API_URL = 'https://api.intra.42.fr/v2/me'
+
 
 # Application definition
 
@@ -39,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -50,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    #'users.middleware.AuthRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'transcendence.urls'
@@ -65,6 +75,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'users.context_processors.user_data',
             ],
         },
     },
