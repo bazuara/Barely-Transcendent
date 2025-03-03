@@ -3,6 +3,8 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- En el head de templates/base.html -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
         <title>SPA with Django & htmx</title>
         {% load bootstrap5 %}
         {% bootstrap_css %}
@@ -10,8 +12,10 @@
         <script src="https://unpkg.com/htmx.org"></script>
     </head>
     <body>
-        <!-- Cargar el Header desde un partial -->
-        {% include "partials/header.html" %}
+        <!-- Cargar el Header desde un partial con ID para poder actualizarlo (al final uso intra_login) -->
+        <div id="header-container">
+            {% include "partials/header.html" %}
+        </div>
         <!-- Contenido dinámico -->
         <main id="content" class="container my-4">
             {% block content %}
