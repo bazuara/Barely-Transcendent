@@ -29,4 +29,5 @@ urlpatterns = [
     path('logout/', logout, name='logout'),  # Añadir ruta para cerrar sesión
     path('profile/', profile, name='profile'),  # Añadir ruta para ver perfil
     path('profile/update/', update_profile, name='update_profile'),  # Añadir ruta para actualizar perfil
+    path('pong/', views.pong, name='pong'),
 ]

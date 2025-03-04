@@ -27,3 +27,13 @@ def home(request):
 def about(request):
     template = "partials/about.html" if request.htmx else "about.html"
     return render(request, template)
+
+def pong(request):
+    # Verificar si el usuario está autenticado
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return redirect('login')
+    
+    template = "partials/pong.html" if request.htmx else "pong.html"
+    return render(request, template)
+
