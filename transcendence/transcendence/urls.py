@@ -15,12 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from transcendence import views
+from users.views import login, oauth_callback, logout, profile, update_profile
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.home, name='home'),
+    path('', login, name='login'),
+    path('oauth/callback', oauth_callback, name='oauth_callback'),
+    path('home/', views.home, name='home'),
     path('about/', views.about, name='about'),
+    path('logout/', logout, name='logout'),  # Añadir ruta para cerrar sesión
+    path('profile/', profile, name='profile'),  # Añadir ruta para ver perfil
+    path('profile/update/', update_profile, name='update_profile'),  # Añadir ruta para actualizar perfil
 ]
