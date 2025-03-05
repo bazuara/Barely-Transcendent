@@ -1,25 +1,48 @@
-<div class="container py-5">
-    <div class="row mb-4">
+<div class="container py-4">
+    <div class="row mb-3">
         <div class="col-12 text-center">
             <h1 class="display-4">Pong</h1>
             <p class="lead">¡Demuestra tus habilidades en este clásico juego!</p>
         </div>
     </div>
     
-    <div class="row justify-content-center mb-5">
+    <div class="row justify-content-center mb-4">
         <div class="col-md-4 mb-3">
             <div class="d-grid">
-                <button class="btn btn-primary btn-lg">Jugar Local</button>
+                <button id="play-local-btn" class="btn btn-primary btn-lg">Jugar Local</button>
             </div>
         </div>
         <div class="col-md-4 mb-3">
             <div class="d-grid">
-                <button class="btn btn-success btn-lg">Jugar Online</button>
+                <button id="play-online-btn" class="btn btn-success btn-lg">Jugar Online</button>
             </div>
         </div>
     </div>
     
-    <div class="row">
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-lg-8">
+            <!-- Contenedor del juego con relación de aspecto 4:3 -->
+            <div id="game-container" class="d-none">
+                <div class="bg-dark rounded position-relative overflow-hidden" style="aspect-ratio: 4/3;">
+                    <canvas id="pong-canvas" class="w-100 h-100"></canvas>
+                    
+                    <!-- Puntajes -->
+                    <div class="position-absolute top-0 start-0 end-0 d-flex justify-content-between p-3">
+                        <h3 id="player1-score" class="text-white">0</h3>
+                        <h3 id="player2-score" class="text-white">0</h3>
+                    </div>
+                    
+                    <!-- Mensaje central -->
+                    <div id="game-message" class="position-absolute top-50 start-50 translate-middle text-white p-3 rounded bg-dark bg-opacity-75 d-none">
+                        <h3 class="text-center">¿Listo?</h3>
+                        <p class="text-center mb-0">Presiona ESPACIO para comenzar</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row" id="instructions-section">
         <div class="col-lg-8 mx-auto">
             <div class="card shadow-sm">
                 <div class="card-header bg-dark text-white">
@@ -31,8 +54,9 @@
                     
                     <h5>Controles</h5>
                     <ul>
-                        <li><strong>Jugador 1:</strong> Teclas W (arriba) y S (abajo)</li>
-                        <li><strong>Jugador 2:</strong> Teclas flecha arriba y flecha abajo</li>
+                        <li><strong>Jugador 1 (izquierda):</strong> Teclas W (arriba) y S (abajo)</li>
+                        <li><strong>Jugador 2 (derecha):</strong> Teclas flecha arriba y flecha abajo</li>
+                        <li><strong>Iniciar/Pausar:</strong> Tecla ESPACIO</li>
                     </ul>
                     
                     <h5>Reglas</h5>
@@ -47,3 +71,31 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Asegúrate de que este script se ejecute después de cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded");
+        // Configurar el botón de juego local
+        const playLocalBtn = document.getElementById('play-local-btn');
+        if (playLocalBtn) {
+            playLocalBtn.addEventListener('click', function() {
+                console.log("Local play button clicked");
+                // Mostrar el canvas y mensaje de inicio
+                document.getElementById('game-container').classList.remove('d-none');
+                document.getElementById('game-message').classList.remove('d-none');
+                
+                // Iniciar el juego (con un pequeño retraso para asegurar que el DOM está actualizado)
+                setTimeout(function() {
+                    if (typeof initPongGame === 'function') {
+                        initPongGame();
+                    } else {
+                        console.error("initPongGame function not found. Is pong.js loaded properly?");
+                    }
+                }, 100);
+            });
+        } else {
+            console.error("Play local button not found");
+        }
+    });
+</script>

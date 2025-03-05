@@ -1,4 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+    <!-- <link rel="stylesheet" href="{% static 'css/pong.css' %}"> # esto lo dejo para mas tarde si me apetece -- > 
+{% endblock %}
+
 {% block content %}
     {% include "partials/pong.html" %}
 {% endblock content %}
+
+{% block extra_scripts %}
+    <script src="{% static 'js/pong.js' %}"></script>
+{% endblock %}
+
