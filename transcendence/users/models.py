@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils import timezone
 
-
 class User(models.Model):
     internal_id = models.AutoField(primary_key=True)
     intra_id = models.IntegerField(unique=True)
@@ -14,6 +13,10 @@ class User(models.Model):
     user_creation = models.DateTimeField(auto_now_add=True)
     last_online = models.DateTimeField(default=timezone.now)
 
+    # Campos para estadísticas del juego
+    games_played = models.IntegerField(default=0)
+    games_won = models.IntegerField(default=0)
+    total_points = models.IntegerField(default=0)
+
     def __str__(self):
         return str(self.intra_id)
-    

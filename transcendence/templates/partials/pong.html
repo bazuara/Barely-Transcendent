@@ -76,6 +76,7 @@
     // Asegúrate de que este script se ejecute después de cargar la página
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
+
         // Configurar el botón de juego local
         const playLocalBtn = document.getElementById('play-local-btn');
         if (playLocalBtn) {
@@ -97,5 +98,28 @@
         } else {
             console.error("Play local button not found");
         }
+
+        // Configurar el botón de juego online
+        const playOnlineBtn = document.getElementById('play-online-btn');
+        if (playOnlineBtn) {
+            playOnlineBtn.addEventListener('click', function() {
+                console.log("Online play button clicked");
+                // Mostrar el canvas y mensaje de inicio
+                document.getElementById('game-container').classList.remove('d-none');
+                document.getElementById('game-message').classList.remove('d-none');
+                
+                // Iniciar el juego online (con un pequeño retraso para asegurar que el DOM está actualizado)
+                setTimeout(function() {
+                    if (typeof initOnlineGame === 'function') {
+                        initOnlineGame();
+                    } else {
+                        console.error("initOnlineGame function not found. Is pong-online.js loaded properly?");
+                    }
+                }, 100);
+            });
+        } else {
+            console.error("Play online button not found");
+        }
     });
 </script>
+

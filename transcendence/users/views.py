@@ -1,9 +1,11 @@
 import requests
 from django.shortcuts import render, redirect
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseServerError, JsonResponse
 from .models import User
 from django.utils import timezone
+from django.contrib.auth import login as auth_login # para el fake login
+
 
 #oauth_url = (
 #    "https://api.intra.42.fr/oauth/authorize"
@@ -155,3 +157,16 @@ def oauth_callback(request):
 def logout(request):
     request.session.flush()
     return redirect('login')
+
+
+# Endpoint para simular el inicio de sesión durante las pruebas
+def mock_login(request):
+    # Obtén el usuario de prueba
+    user = User.objects.filter(intra_login="testuser").first()
+
+    if user:
+        # Simula la autenticación manualmente
+        request.session['user_id'] = user.internal_id  # Guarda el ID del usuario en la sesión
+        return JsonResponse({"status": "success", "message": "Mock login successful"})
+    else:
+        return JsonResponse({"status": "error", "message": "User not found"}, status=400)

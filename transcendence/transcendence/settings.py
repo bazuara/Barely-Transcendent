@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django_htmx',
     'users',
     'pong',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'transcendence.wsgi.application'
+ASGI_APPLICATION = 'transcendence.asgi.application'
+
+# Para usar canales con Redis, base de datos en memoria
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 
 # Database
