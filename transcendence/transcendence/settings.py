@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
+    'ws4redis',
     'users',
 ]
 
@@ -64,7 +65,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    #'users.middleware.AuthRequiredMiddleware',
+    # 'users.middleware.AuthRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'transcendence.urls'
@@ -121,6 +122,15 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# websocket redis settings
+WEBSOCKET_URL = '/ws/'
+WS4REDIS_CONNECTION = {
+    'host': 'redis',
+    'port': os.getenv('REDIS_PORT'),
+    'db': os.getenv('REDIS_DATABASE'),
+    'password': os.getenv('REDIS_PASSWORD'),
+}
 
 
 # Internationalization

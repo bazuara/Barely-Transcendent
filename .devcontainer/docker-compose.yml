@@ -5,7 +5,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ../..:/workspaces:cached      
-    network_mode: service:db
+    networks:
+      - barely_a_network
     command: sleep infinity
     env_file:
       - .env
@@ -15,10 +16,24 @@ services:
     restart: unless-stopped
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - barely_a_network
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
+
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - barely_a_network
+
+networks:
+  barely_a_network:
+    driver: bridge
 
 volumes:
   postgres-data:
