@@ -7,49 +7,79 @@
                 </div>
                 <div class="card-body">
                     {% if success %}
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        Perfil actualizado correctamente
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            Perfil actualizado correctamente
+                            <button type="button"
+                                    class="btn-close"
+                                    data-bs-dismiss="alert"
+                                    aria-label="Close"></button>
+                        </div>
                     {% endif %}
-                    
                     <div class="row mb-4">
                         <div class="col-md-4 text-center">
                             {% if user.intra_picture %}
-                            <img src="{{ user.intra_picture }}" alt="{{ user.intra_login }}" class="img-thumbnail mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                                <img src="{{ user.intra_picture }}"
+                                     alt="{{ user.intra_login }}"
+                                     class="img-thumbnail mb-3"
+                                     style="width: 150px;
+                                            height: 150px;
+                                            object-fit: cover">
                             {% else %}
-                            <div class="bg-light d-flex align-items-center justify-content-center mb-3" style="width: 150px; height: 150px; margin: 0 auto;">
-                                <span class="text-muted">Sin imagen</span>
-                            </div>
+                                <div class="bg-light d-flex align-items-center justify-content-center mb-3"
+                                     style="width: 150px;
+                                            height: 150px;
+                                            margin: 0 auto">
+                                    <span class="text-muted">Sin imagen</span>
+                                </div>
                             {% endif %}
                         </div>
                         <div class="col-md-8">
                             <h4>Información del usuario</h4>
-                            <p><strong>Nombre de usuario:</strong> {{ user.internal_login }}</p>
-                            <p><strong>ID:</strong> {{ user.intra_id }}</p>
-                            <p><strong>Usuario 42:</strong> {{ user.intra_login }}</p>
-                            <p><strong>Nombre:</strong> {{ user.intra_name }} {{ user.intra_surname }}</p>
-                            <p><strong>Registrado desde:</strong> {{ user.user_creation|date:"d/m/Y H:i" }}</p>
+                            <p>
+                                <strong>Nombre de usuario:</strong> {{ user.internal_login }}
+                            </p>
+                            <p>
+                                <strong>ID:</strong> {{ user.intra_id }}
+                            </p>
+                            <p>
+                                <strong>Usuario 42:</strong> {{ user.intra_login }}
+                            </p>
+                            <p>
+                                <strong>Nombre:</strong> {{ user.intra_name }} {{ user.intra_surname }}
+                            </p>
+                            <p>
+                                <strong>Registrado desde:</strong> {{ user.user_creation|date:"d/m/Y H:i" }}
+                            </p>
                         </div>
                     </div>
-
-                    <form hx-post="{% url 'update_profile' %}" hx-target="#content" class="mt-4">
+                    <form hx-post="{% url 'update_profile' %}"
+                          hx-target="#content"
+                          class="mt-4">
                         {% csrf_token %}
                         <h4>Información Personalizada</h4>
                         <div class="mb-3">
                             <label for="internal_login" class="form-label">Nombre de usuario</label>
-                            <input type="text" class="form-control" id="internal_login" name="internal_login" value="{{ user.internal_login }}" required>
+                            <input type="text"
+                                   class="form-control"
+                                   id="internal_login"
+                                   name="internal_login"
+                                   value="{{ user.internal_login }}"
+                                   required>
                             <div class="form-text">Este es el nombre que se mostrará a otros usuarios.</div>
                         </div>
-                        
                         <!-- Aquí se puede agregar la funcionalidad para cambiar la imagen de perfil más adelante -->
-                        
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a class="btn btn-secondary" 
+                            <a class="btn btn-secondary"
                                href="{% url 'home' %}"
                                hx-get="{% url 'home' %}"
                                hx-target="#content"
                                hx-push-url="true">Cancelar</a>
+                            {% comment %} self anonimize user button {% endcomment %}
+                            <a class="btn btn-danger"
+                               href="{% url 'anonimize' %}"
+                               hx-get="{% url 'anonimize' %}"
+                               hx-target="#content"
+                               hx-push-url="true">Eliminar cuenta</a>
                             <button type="submit" class="btn btn-primary">Guardar cambios</button>
                         </div>
                     </form>
