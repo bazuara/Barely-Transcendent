@@ -49,10 +49,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
-    'ws4redis',
+    'channels',
     'users',
 ]
 
@@ -87,7 +88,27 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'transcendence.wsgi.application'
+ASGI_APPLICATION = 'transcendence.asgi.application'
+
+
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "host": REDIS_HOST,
+                    "port": REDIS_PORT,
+                    "password": REDIS_PASSWORD
+                }
+            ],
+        },
+    },
+}
 
 
 # Database
@@ -122,15 +143,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
-# websocket redis settings
-WEBSOCKET_URL = '/ws/'
-WS4REDIS_CONNECTION = {
-    'host': 'redis',
-    'port': os.getenv('REDIS_PORT'),
-    'db': os.getenv('REDIS_DATABASE'),
-    'password': os.getenv('REDIS_PASSWORD'),
-}
 
 
 # Internationalization

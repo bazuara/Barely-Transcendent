@@ -25,9 +25,11 @@ services:
 
   redis:
     image: redis:latest
-    restart: unless-stopped
     env_file:
       - .env
+    command: >
+          --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    restart: unless-stopped
     networks:
       - barely_a_network
 
