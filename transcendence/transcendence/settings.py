@@ -49,9 +49,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
+    'channels',
     'users',
 ]
 
@@ -64,7 +66,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    #'users.middleware.AuthRequiredMiddleware',
+    # 'users.middleware.AuthRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'transcendence.urls'
@@ -86,7 +88,27 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'transcendence.wsgi.application'
+ASGI_APPLICATION = 'transcendence.asgi.application'
+
+
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "host": REDIS_HOST,
+                    "port": REDIS_PORT,
+                    "password": REDIS_PASSWORD
+                }
+            ],
+        },
+    },
+}
 
 
 # Database
