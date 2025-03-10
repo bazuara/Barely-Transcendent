@@ -167,7 +167,7 @@ def logout(request):
 # Endpoint para simular el inicio de sesión durante las pruebas
 def mock_login(request):
     # Obtén el usuario de prueba
-    user = User.objects.filter(intra_login="testuser").first()
+    user = User.objects.filter(intra_login="Test").first()
 
     if user:
         # Simula la autenticación manualmente
