@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from transcendence import views
-from users.views import login, oauth_callback, logout, profile, update_profile, mock_login
+from users.views import login, oauth_callback, logout, profile, update_profile, mock_login, anonimize
 
 
 urlpatterns = [
@@ -31,4 +31,5 @@ urlpatterns = [
     path('profile/update/', update_profile, name='update_profile'),  # Añadir ruta para actualizar perfil
     path('pong/', views.pong, name='pong'),
     path('mock-login/', mock_login, name='mock_login'),
+    path('profile/anonimize/', anonimize, name='anonimize'),
 ]

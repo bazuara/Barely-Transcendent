@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Cargar variables desde el archivo .env
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,8 +33,8 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 # 42 OAuth Settings
-OAUTH_42_CLIENT_ID = 'u-s4t2ud-254f5f29fbea7b7489f9a2b1a17fb2b605f2c7999426345b76aa3b17c9427855'
-OAUTH_42_CLIENT_SECRET = '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'
+OAUTH_42_CLIENT_ID = os.getenv("OAUTH_42_CLIENT_ID")
+OAUTH_42_CLIENT_SECRET = os.getenv("OAUTH_42_CLIENT_SECRET")
 OAUTH_42_REDIRECT_URI = 'http://127.0.0.1:8000/oauth/callback'
 OAUTH_42_AUTHORIZATION_URL = 'https://api.intra.42.fr/oauth/authorize'
 OAUTH_42_TOKEN_URL = 'https://api.intra.42.fr/oauth/token'
@@ -44,9 +49,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'daphne',
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
+    'channels',
     'users',
     'pong',
     'channels',
@@ -83,15 +90,24 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'transcendence.wsgi.application'
 ASGI_APPLICATION = 'transcendence.asgi.application'
+WSGI_APPLICATION = 'transcendence.wsgi.application'
 
-# Para usar canales con Redis, base de datos en memoria
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "host": REDIS_HOST,
+                    "port": REDIS_PORT,
+                    "password": REDIS_PASSWORD
+                }
+            ],
         },
     },
 }
