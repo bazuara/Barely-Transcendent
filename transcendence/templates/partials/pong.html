@@ -50,7 +50,7 @@
                 </div>
                 <div class="card-body">
                     <h5>Objetivo del juego</h5>
-                    <p>Ser el primero en ganar 3 puntos enviando la pelota más allá de la paleta de tu oponente.</p>
+                    <p>Ser el primero en ganar 5 puntos enviando la pelota más allá de la paleta de tu oponente.</p>
                     
                     <h5>Controles</h5>
                     <ul>
@@ -64,8 +64,7 @@
                     
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle-fill me-2"></i>
-                        ¡El primero en alcanzar 3 puntos gana la partida!
-                    </div>
+                        ¡El primero en alcanzar 5 puntos gana la partida!</div>
                 </div>
             </div>
         </div>
@@ -73,9 +72,13 @@
 </div>
 
 <script>
+    // Establecer el ID del usuario actual para que el juego lo use
+    window.currentUserId = {{ user.internal_id }};
+    
     // Asegúrate de que este script se ejecute después de cargar la página
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
+        console.log("Current user ID:", window.currentUserId);
 
         // Configurar el botón de juego local
         const playLocalBtn = document.getElementById('play-local-btn');
@@ -122,4 +125,3 @@
         }
     });
 </script>
-

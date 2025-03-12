@@ -215,6 +215,11 @@ function initPongGame() {
     function handleKeyDown(event) {
         keysPressed[event.key] = true;
         
+        // Prevenir el comportamiento predeterminado de las flechas arriba y abajo
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+        }
+        
         if ((event.key === ' ' || event.key === 'Spacebar') && !gameOver) {
             event.preventDefault();
             if (!gameRunning) {

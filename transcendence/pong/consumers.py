@@ -124,7 +124,7 @@ class PongConsumer(AsyncWebsocketConsumer):
                     print(f"[DEBUG] Ambos jugadores añadidos al grupo {room_id}")
                     
                     # Configurar el estado del juego con velocidades más altas
-                    base_speed = 0.025  # Velocidad base aumentada a 0.025
+                    base_speed = 0.015  # Velocidad base aumentada a 0.035
                     active_games[room_id] = {
                         'ball_x': 0.5,
                         'ball_y': 0.5,
@@ -133,7 +133,9 @@ class PongConsumer(AsyncWebsocketConsumer):
                         'player1_score': 0,
                         'player2_score': 0,
                         'left_paddle': 0.5,
-                        'right_paddle': 0.5
+                        'right_paddle': 0.5,
+                        'player1_id': player1_id,  # Guardar los IDs de los jugadores en el estado
+                        'player2_id': player2_id
                     }
                     
                     # Iniciar el movimiento de la pelota
@@ -167,7 +169,7 @@ class PongConsumer(AsyncWebsocketConsumer):
         try:
             game_data = active_games[room_id]
             paddle_height = 0.2  # Altura de la paleta en unidades normalizadas
-            base_speed = 0.01   # Velocidad base para cálculos
+            base_speed = 0.015   # Velocidad base para cálculos
             
             # Frecuencia de actualización más alta para movimientos más suaves
             update_interval = 0.02  # 20ms = 50 FPS
@@ -179,31 +181,31 @@ class PongConsumer(AsyncWebsocketConsumer):
                 
                 # Rebote en paredes superior e inferior - más dinámico
                 if game_data['ball_y'] <= 0 or game_data['ball_y'] >= 1:
-                    game_data['ball_dy'] = -game_data['ball_dy'] * 1.01  # Ligero aumento de velocidad en rebotes
+                    game_data['ball_dy'] = -game_data['ball_dy'] * 1.02  # Ligero aumento de velocidad en rebotes
                     # Corregir posición para evitar quedarse fuera de los límites
                     game_data['ball_y'] = max(0.01, min(0.99, game_data['ball_y']))
                 
                 # Colisión con paleta izquierda - ajustada para mejor correspondencia visual
-                if (game_data['ball_x'] <= 0.03 and  # Cambiado de 0.05 a 0.03
+                if (game_data['ball_x'] <= 0.02 and  # Cambiado de 0.05 a 0.03
                     game_data['ball_x'] >= -0.01 and  # Permitir un poco de tolerancia negativa para conexiones lentas
                     game_data['ball_y'] >= game_data['left_paddle'] - paddle_height/2 and 
                     game_data['ball_y'] <= game_data['left_paddle'] + paddle_height/2):
                     
                     game_data['ball_dx'] = -game_data['ball_dx'] * 1.1  # Mayor aceleración
-                    game_data['ball_x'] = 0.03  # Ajustar a la misma distancia que la condición
+                    game_data['ball_x'] = 0.02  # Ajustar a la misma distancia que la condición
                     
                     # Cambiar dirección vertical según dónde golpea la paleta - efecto más pronunciado
                     relative_intersection = (game_data['ball_y'] - game_data['left_paddle']) / (paddle_height/2)
                     game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
                 
                 # Colisión con paleta derecha - ajustada para mejor correspondencia visual
-                if (game_data['ball_x'] >= 0.97 and  # Cambiado de 0.95 a 0.97
+                if (game_data['ball_x'] >= 0.99 and  # Cambiado de 0.95 a 0.97
                     game_data['ball_x'] <= 1.01 and  # Permitir un poco de tolerancia positiva para conexiones lentas
                     game_data['ball_y'] >= game_data['right_paddle'] - paddle_height/2 and 
                     game_data['ball_y'] <= game_data['right_paddle'] + paddle_height/2):
                     
                     game_data['ball_dx'] = -game_data['ball_dx'] * 1.1  # Mayor aceleración
-                    game_data['ball_x'] = 0.97  # Ajustar a la misma distancia que la condición
+                    game_data['ball_x'] = 0.99  # Ajustar a la misma distancia que la condición
                     
                     # Cambiar dirección vertical según dónde golpea la paleta - efecto más pronunciado
                     relative_intersection = (game_data['ball_y'] - game_data['right_paddle']) / (paddle_height/2)
@@ -259,31 +261,21 @@ class PongConsumer(AsyncWebsocketConsumer):
                 if game_data['player1_score'] >= 5 or game_data['player2_score'] >= 5:
                     winner = 1 if game_data['player1_score'] >= 5 else 2
                     
-                    # Obtener IDs de los jugadores del grupo
-                    player1_id = None
-                    player2_id = None
-                    
-                    # Buscar jugadores que tienen esta sala
-                    for uid, conn in player_connections.items():
-                        if hasattr(conn, 'room_id') and conn.room_id == room_id:
-                            if player1_id is None:
-                                player1_id = uid
-                            else:
-                                player2_id = uid
-                                break
-                    
-                    # Enviar mensaje de fin de juego con IDs de jugadores
+                    # Enviar mensaje de fin de juego con IDs de jugadores que ya están almacenados
                     await self.channel_layer.group_send(
                         room_id,
                         {
                             'type': 'game_over',
                             'winner': winner,
-                            'player1_id': player1_id,
-                            'player2_id': player2_id,
+                            'player1_id': game_data['player1_id'],
+                            'player2_id': game_data['player2_id'],
                             'player1_score': game_data['player1_score'],
                             'player2_score': game_data['player2_score']
                         }
                     )
+                    
+                    # Guardar los resultados en la base de datos
+                    await self.save_game_results(room_id, game_data)
                     
                     # Limpiar los datos del juego
                     if room_id in active_games:
@@ -311,6 +303,26 @@ class PongConsumer(AsyncWebsocketConsumer):
             print(f"[ERROR] Error en move_ball: {e}")
             if room_id in active_games:
                 del active_games[room_id]
+    
+    @database_sync_to_async
+    def save_game_results(self, room_id, game_data):
+        """
+        Guarda los resultados de la partida en la base de datos.
+        """
+        try:
+            # Actualizar el objeto Game en la base de datos si es posible
+            game = Game.objects.filter(room_id=room_id).first()
+            if game:
+                game.player1_score = game_data['player1_score']
+                game.player2_score = game_data['player2_score']
+                game.is_active = False
+                game.save()
+                
+                # No necesitamos actualizar las estadísticas de usuario aquí
+                # porque el cliente lo hará mediante el mensaje 'game_over'
+                print(f"[DEBUG] Guardados resultados de partida {room_id} en la base de datos")
+        except Exception as e:
+            print(f"[ERROR] Error al guardar resultados de la partida: {e}")
     
     async def disconnect(self, close_code):
         """
@@ -399,6 +411,10 @@ class PongConsumer(AsyncWebsocketConsumer):
                 
         elif message_type == 'join_queue':
             # Este mensaje ya se procesa en connect(), podemos ignorarlo aquí
+            # Pero podemos verificar que el ID del usuario sea correcto
+            user_id = data.get('user_id')
+            if user_id and user_id != self.user.internal_id:
+                print(f"[WARNING] ID de usuario en mensaje join_queue ({user_id}) no coincide con ID de sesión ({self.user.internal_id})")
             pass
         else:
             # Ignorar otros tipos de mensajes por ahora

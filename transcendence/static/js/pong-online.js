@@ -26,6 +26,18 @@ let gameInitialized = false; // Para evitar inicializaciones múltiples
 const PADDLE_INTERPOLATION_SPEED = 0.3; // Velocidad para paletas
 const BALL_INTERPOLATION_SPEED = 0.5;   // Velocidad más alta para la pelota, más responsiva
 
+// Función para obtener el ID del usuario actual
+function getUserId() {
+    // Intentar obtener de la variable global que establecemos en la plantilla
+    if (typeof currentUserId !== 'undefined') {
+        return currentUserId;
+    }
+    
+    // Fallback: usar el ID del usuario del contexto Django
+    // Esto debería ser reemplazado automáticamente por Django en el template
+    return user.internal_id ;
+}
+
 // Inicializar el juego
 function initOnlineGame() {
     // Evitar inicializaciones múltiples
@@ -36,26 +48,6 @@ function initOnlineGame() {
     
     gameInitialized = true;
     console.log("[DEBUG] Inicializando juego online...");
-
-    // Asignación manual del jugador
-    // Intentar obtener playerNumber del localStorage o cookies
-    playerNumber = parseInt(localStorage.getItem('pongPlayerNumber') || '0');
-
-    // Si no hay valor guardado, asignar uno basado en el momento actual
-    if (!playerNumber) {
-        // Si el timestamp actual es par, eres jugador 1, si es impar, jugador 2
-        // Esto asegura que dos ventanas abiertas al mismo tiempo tendrán distintos números
-        playerNumber = (Date.now() % 2) + 1;
-        localStorage.setItem('pongPlayerNumber', playerNumber.toString());
-    }
-
-    console.log(`[DEBUG] ¡Asignación manual! Soy el jugador ${playerNumber}`);
-
-    // Actualizar la UI para mostrar qué jugador soy
-    const playerIndicator = document.createElement('div');
-    playerIndicator.className = 'position-absolute top-0 start-0 bg-dark bg-opacity-75 text-white p-2';
-    playerIndicator.innerText = `Eres el jugador ${playerNumber}`;
-    document.getElementById('game-container').appendChild(playerIndicator);
 
     // Obtener el canvas y el contexto
     canvas = document.getElementById('pong-canvas');
@@ -93,7 +85,7 @@ function initOnlineGame() {
         }
         
         // Solo enviar si realmente se movió
-        if (hasMoved) {
+        if (hasMoved && playerNumber) { // Asegurarse de que playerNumber esté definido
             sendPaddleMovement(playerNumber === 1 ? 'player1' : 'player2', myPaddleY);
         }
     }, 20); // 50 fps
@@ -140,11 +132,12 @@ function connectWebSocket() {
         
         setTimeout(function() {
             if (socket && socket.readyState === WebSocket.OPEN) {
-                console.log("[DEBUG] Enviando solicitud de emparejamiento...");
+                const userId = getUserId();
+                console.log(`[DEBUG] Enviando solicitud de emparejamiento para el usuario ${userId}...`);
                 socket.send(JSON.stringify({
                     type: "join_queue",
                     room_id: roomId,
-                    user_id: 999999  // Cambia esto por el ID del usuario real
+                    user_id: userId  // Usar el ID real del usuario
                 }));
             }
         }, 100);
@@ -186,8 +179,25 @@ function handleWebSocketMessage(data) {
             isWaitingForOpponent = false;  // Ya no está esperando
             roomId = data.room_id;
 
-            // Nota: No sobreescribimos playerNumber aquí, porque ya lo asignamos manualmente
-            console.log(`[DEBUG] Manteniendo asignación manual como jugador ${playerNumber}`);
+            // Determinar el número de jugador basado en los IDs recibidos
+            const userId = getUserId();
+            
+            if (userId === data.player1) {
+                playerNumber = 1;
+            } else if (userId === data.player2) {
+                playerNumber = 2;
+            } else {
+                console.error("[ERROR] No se pudo determinar el número de jugador. Mi ID:", userId, "IDs recibidos:", data.player1, data.player2);
+                playerNumber = Math.random() < 0.5 ? 1 : 2; // Fallback por si acaso
+            }
+            
+            // Actualizar la UI para mostrar qué jugador soy
+            const playerIndicator = document.createElement('div');
+            playerIndicator.className = 'position-absolute top-0 start-0 bg-dark bg-opacity-75 text-white p-2';
+            playerIndicator.innerText = `Eres el jugador ${playerNumber}`;
+            document.getElementById('game-container').appendChild(playerIndicator);
+            
+            console.log(`[DEBUG] Asignado como jugador ${playerNumber}`);
 
             // Actualizar la URL con el room_id sin recargar la página
             const newUrl = `${window.location.pathname}?room_id=${data.room_id}`;
@@ -218,11 +228,19 @@ function handleWebSocketMessage(data) {
                               (playerNumber === 2 && data.player === 'player2');
             
             if (isMyPaddle) {
-                // Es mi propia paleta - aplicar directamente
-                myPaddleY = data.paddle_position;
+                // Es mi propia paleta - aplicar solo si hay una discrepancia significativa
+                if (Math.abs(myPaddleY - data.paddle_position) > 0.1) {
+                    console.log("[DEBUG] Corrigiendo desincronización de MI paleta:", 
+                                myPaddleY, "->", data.paddle_position);
+                    myPaddleY = data.paddle_position;
+                } else {
+                    // Ignorar pequeñas diferencias para reducir procesamiento innecesario
+                    console.log("[DEBUG] Ignorando eco de servidor para MI paleta");
+                }
             } else {
                 // Es la paleta del oponente - actualizar objetivo para interpolación
                 targetOpponentPaddleY = data.paddle_position;
+                console.log("[DEBUG] Actualizando paleta del OPONENTE a:", data.paddle_position);
             }
             break;
 
@@ -265,8 +283,6 @@ function handleWebSocketMessage(data) {
             }
             break;
 
-        // Modificar la sección del case 'game_over' en handleWebSocketMessage:
-
         case 'game_over':
             console.log("[DEBUG] La partida ha terminado.", data);
             isWaitingForOpponent = true;
@@ -274,18 +290,17 @@ function handleWebSocketMessage(data) {
             // Determinar el mensaje adecuado según la perspectiva del jugador
             let gameOverMessage;
             let winner = data.winner;
-            let iWon = false;
+            // No redeclarar userId, usamos el que ya está definido anteriormente
+            
+            // Determinar correctamente si este cliente ganó la partida
+            // El ganador es "player1" (winner=1) o "player2" (winner=2)
+            // Necesitamos comprobar si nuestro ID corresponde al ganador
+            const winningPlayerId = winner === 1 ? data.player1_id : data.player2_id;
+            const iWon = getUserId() === winningPlayerId;
             
             if (winner === 0) {
                 gameOverMessage = data.message || 'La partida ha terminado';
             } else {
-                // Determinar si este jugador ganó
-                if (playerNumber === 1) {
-                    iWon = (winner === 1);
-                } else { // playerNumber === 2
-                    iWon = (winner === 2);
-                }
-                
                 if (iWon) {
                     gameOverMessage = '¡Has ganado! 🎉';
                 } else {
@@ -306,20 +321,16 @@ function handleWebSocketMessage(data) {
             // Enviar estadísticas al backend
             if (socket && socket.readyState === WebSocket.OPEN) {
                 let myScore = playerNumber === 1 ? player1Score : player2Score;
-                let playerId = playerNumber === 1 ? data.player1_id : data.player2_id;
                 
-                if (playerId) {
-                    socket.send(JSON.stringify({
-                        action: 'game_over',
-                        player_id: playerId,
-                        points_scored: myScore,
-                        has_won: iWon
-                    }));
-                    console.log(`[DEBUG] Enviando estadísticas: jugador=${playerId}, puntos=${myScore}, victoria=${iWon}`);
-                }
+                socket.send(JSON.stringify({
+                    action: 'game_over',
+                    player_id: getUserId(),
+                    points_scored: myScore,
+                    has_won: iWon
+                }));
+                console.log(`[DEBUG] Enviando estadísticas: jugador=${getUserId()}, puntos=${myScore}, victoria=${iWon}`);
             }
             break;
-
 
         case 'error':
             console.error("[DEBUG] Error del servidor:", data.message);
