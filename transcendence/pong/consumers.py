@@ -123,6 +123,10 @@ class PongConsumer(AsyncWebsocketConsumer):
                     
                     print(f"[DEBUG] Ambos jugadores añadidos al grupo {room_id}")
                     
+                    # Obtener la información de usuario para ambos jugadores
+                    player1_info = await self.get_user_info(player1_id)
+                    player2_info = await self.get_user_info(player2_id)
+                    
                     # Configurar el estado del juego con velocidades más altas
                     base_speed = 0.015  # Velocidad base aumentada a 0.035
                     active_games[room_id] = {
@@ -148,8 +152,8 @@ class PongConsumer(AsyncWebsocketConsumer):
                         {
                             'type': 'game_start',
                             'room_id': room_id,
-                            'player1': player1_id,
-                            'player2': player2_id
+                            'player1': player1_info,
+                            'player2': player2_info
                         }
                     )
                     print(f"[DEBUG] Notificando a los jugadores que la partida ha comenzado. Room ID: {room_id}")
@@ -161,6 +165,26 @@ class PongConsumer(AsyncWebsocketConsumer):
                 print(f"[ERROR] Error al crear la partida: {e}")
                 # Devolver los jugadores a la cola
                 waiting_players.extend([player1_id, player2_id])
+    
+    @database_sync_to_async
+    def get_user_info(self, user_id):
+        """
+        Obtiene información básica del usuario para enviar al cliente.
+        """
+        try:
+            user = User.objects.get(internal_id=user_id)
+            return {
+                'id': user.internal_id,
+                'intra_id': user.intra_id,
+                'intra_login': user.internal_login or user.intra_login,  # Usar internal_login si está disponible
+                'intra_picture': user.intra_picture
+            }
+        except User.DoesNotExist:
+            return {
+                'id': user_id,
+                'intra_login': f'Usuario {user_id}',
+                'intra_picture': None
+            }
     
     async def move_ball(self, room_id):
         """
@@ -511,3 +535,4 @@ class PongConsumer(AsyncWebsocketConsumer):
         if has_won:
             user.games_won += 1
         user.save()
+        

@@ -11,6 +11,11 @@ let targetBallY = 0.5;
 let player1Score = 0;      // Puntuación del jugador 1
 let player2Score = 0;      // Puntuación del jugador 2
 
+// Variables para información de jugadores
+let player1Data = null;    // Datos del jugador 1
+let player2Data = null;    // Datos del jugador 2
+let myPlayerNumber = null; // Si soy jugador 1 o 2
+
 // Variables para control de actualizaciones
 let lastPaddleUpdate = 0;  // Último momento en que se envió una actualización de paleta
 let lastFrameTime = 0;     // Para cálculos de deltaTime
@@ -21,6 +26,10 @@ let roomId = null;
 let isWaitingForOpponent = true;  // Indica si el jugador está esperando a un oponente
 let playerNumber = null; // Para saber si somos el jugador 1 o 2
 let gameInitialized = false; // Para evitar inicializaciones múltiples
+let keysPressed = {};    // Para tracking de teclas presionadas
+
+// Variable para el intervalo de movimiento de la paleta
+let paddleMoveInterval = null;
 
 // Variables para control de animación
 let animationFrameId = null; // Para poder cancelar el loop de animación
@@ -57,6 +66,13 @@ function cleanupOnlineGame() {
         socket = null;
     }
     
+    // Limpiar el intervalo de movimiento de la paleta
+    if (paddleMoveInterval) {
+        clearInterval(paddleMoveInterval);
+        paddleMoveInterval = null;
+        console.log("[DEBUG] Intervalo de movimiento de paleta eliminado");
+    }
+    
     // Resetear variables del juego
     myPaddleY = 0.5;
     opponentPaddleY = 0.5;
@@ -73,6 +89,10 @@ function cleanupOnlineGame() {
     gameInitialized = false;
     lastPaddleUpdate = 0;
     lastFrameTime = 0;
+    player1Data = null;
+    player2Data = null;
+    myPlayerNumber = null;
+    keysPressed = {};
     
     // Eliminar indicadores visuales específicos del modo online
     const playerIndicator = document.querySelector('.player-indicator');
@@ -88,12 +108,42 @@ function cleanupOnlineGame() {
         score2Element.textContent = "0";
     }
     
+    // Resetear información de jugadores
+    const player1Name = document.getElementById('player1-name');
+    const player1Avatar = document.getElementById('player1-avatar');
+    const player2Name = document.getElementById('player2-name');
+    const player2Avatar = document.getElementById('player2-avatar');
+    
+    if (player1Name) {
+        player1Name.textContent = "";
+        player1Name.classList.remove('text-primary');
+    }
+    if (player1Avatar) {
+        player1Avatar.src = "";
+        player1Avatar.style.display = "none";
+    }
+    if (player2Name) {
+        player2Name.textContent = "";
+        player2Name.classList.remove('text-primary');
+    }
+    if (player2Avatar) {
+        player2Avatar.src = "";
+        player2Avatar.style.display = "none";
+    }
+    
     // Limpiar el canvas si existe
     if (canvas && ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     
+    // Eliminar todos los event listeners de teclado (que podrían causar bugs)
+    window.onkeydown = null;
+    window.onkeyup = null;
+    
     console.log("[DEBUG] Limpieza del juego online completada");
+    
+    // Devolver una promesa resuelta para poder hacer await si es necesario
+    return Promise.resolve();
 }
 
 // Inicializar el juego
@@ -122,7 +172,7 @@ function initOnlineGame() {
     window.addEventListener('resize', resizeCanvas);
 
     // Configurar manejo de teclas
-    const keysPressed = {};
+    keysPressed = {};
     
     window.addEventListener('keydown', function(event) {
         keysPressed[event.key] = true;
@@ -132,8 +182,14 @@ function initOnlineGame() {
         keysPressed[event.key] = false;
     });
     
-    // Agregar intervalo para movimiento suave de las paletas
-    setInterval(function() {
+    // Limpiar el intervalo anterior si existe
+    if (paddleMoveInterval) {
+        clearInterval(paddleMoveInterval);
+        paddleMoveInterval = null;
+    }
+    
+    // Crear un nuevo intervalo para el movimiento de la paleta
+    paddleMoveInterval = setInterval(function() {
         if (isWaitingForOpponent) return;
         
         const paddleStep = 0.025; // Paso controlado
@@ -232,7 +288,6 @@ function connectWebSocket() {
                 gameMessage.innerHTML = `
                     <h3 class="text-center">Se perdió la conexión</h3>
                     <p class="text-center">Inténtalo de nuevo más tarde</p>
-                    <button class="btn btn-primary mt-3" onclick="window.location.reload()">Reintentar</button>
                 `;
                 gameMessage.classList.remove('d-none');
             }
@@ -242,6 +297,53 @@ function connectWebSocket() {
     socket.onerror = function(error) {
         console.error("[DEBUG] Error en la conexión WebSocket:", error);
     };
+}
+
+// Actualizar la información de los jugadores en la interfaz
+function updatePlayerInfo() {
+    const player1Name = document.getElementById('player1-name');
+    const player1Avatar = document.getElementById('player1-avatar');
+    const player2Name = document.getElementById('player2-name');
+    const player2Avatar = document.getElementById('player2-avatar');
+    
+    // Determinar qué información mostrar en cada lado basado en la perspectiva del jugador actual
+    let leftPlayerData, rightPlayerData;
+    
+    if (myPlayerNumber === 1) {
+        // Soy el jugador 1, así que me muestro a la izquierda
+        leftPlayerData = player1Data;
+        rightPlayerData = player2Data;
+    } else {
+        // Soy el jugador 2, así que me muestro a la izquierda
+        leftPlayerData = player2Data;
+        rightPlayerData = player1Data;
+    }
+    
+    // Actualizar la información del lado izquierdo (siempre el jugador actual)
+    if (leftPlayerData && player1Name && player1Avatar) {
+        player1Name.textContent = leftPlayerData.intra_login || 'Jugador ' + (myPlayerNumber === 1 ? '1' : '2');
+        player1Name.classList.add('text-primary'); // Resaltar siempre mi nombre
+        
+        if (leftPlayerData.intra_picture) {
+            player1Avatar.src = leftPlayerData.intra_picture;
+            player1Avatar.style.display = "block";
+        } else {
+            player1Avatar.style.display = "none";
+        }
+    }
+    
+    // Actualizar la información del lado derecho (siempre el oponente)
+    if (rightPlayerData && player2Name && player2Avatar) {
+        player2Name.textContent = rightPlayerData.intra_login || 'Jugador ' + (myPlayerNumber === 1 ? '2' : '1');
+        player2Name.classList.remove('text-primary'); // Nunca resaltar al oponente
+        
+        if (rightPlayerData.intra_picture) {
+            player2Avatar.src = rightPlayerData.intra_picture;
+            player2Avatar.style.display = "block";
+        } else {
+            player2Avatar.style.display = "none";
+        }
+    }
 }
 
 // Manejar mensajes del WebSocket
@@ -257,28 +359,24 @@ function handleWebSocketMessage(data) {
             // Determinar el número de jugador basado en los IDs recibidos
             const userIdForGame = getUserId();
             
-            if (userIdForGame === data.player1) {
+            if (userIdForGame === data.player1.id) {
                 playerNumber = 1;
-            } else if (userIdForGame === data.player2) {
+                myPlayerNumber = 1;
+            } else if (userIdForGame === data.player2.id) {
                 playerNumber = 2;
+                myPlayerNumber = 2;
             } else {
-                console.error("[ERROR] No se pudo determinar el número de jugador. Mi ID:", userIdForGame, "IDs recibidos:", data.player1, data.player2);
+                console.error("[ERROR] No se pudo determinar el número de jugador. Mi ID:", userIdForGame, "IDs recibidos:", data.player1.id, data.player2.id);
                 playerNumber = Math.random() < 0.5 ? 1 : 2; // Fallback por si acaso
+                myPlayerNumber = playerNumber;
             }
             
-            // Actualizar la UI para mostrar qué jugador soy
-            const gameContainer = document.getElementById('game-container');
-            if (gameContainer) {
-                const existingIndicator = document.querySelector('.player-indicator');
-                if (existingIndicator) {
-                    existingIndicator.remove();
-                }
-                
-                const playerIndicator = document.createElement('div');
-                playerIndicator.className = 'position-absolute top-0 start-0 bg-dark bg-opacity-75 text-white p-2 player-indicator';
-                playerIndicator.innerText = `Eres el jugador ${playerNumber}`;
-                gameContainer.appendChild(playerIndicator);
-            }
+            // Guardar información de los jugadores
+            player1Data = data.player1;
+            player2Data = data.player2;
+            
+            // Actualizar la información de los jugadores en la interfaz
+            updatePlayerInfo();
             
             console.log(`[DEBUG] Asignado como jugador ${playerNumber}`);
 
@@ -353,13 +451,13 @@ function handleWebSocketMessage(data) {
             const score2Element = document.getElementById('player2-score');
             
             if (score1Element && score2Element) {
-                // Para el jugador 2, invertimos la visualización de las puntuaciones
-                if (playerNumber === 2) {
-                    score1Element.textContent = player2Score;
-                    score2Element.textContent = player1Score;
-                } else {
+                // Cada jugador ve su puntuación a la izquierda
+                if (myPlayerNumber === 1) {
                     score1Element.textContent = player1Score;
                     score2Element.textContent = player2Score;
+                } else {
+                    score1Element.textContent = player2Score;
+                    score2Element.textContent = player1Score;
                 }
             }
             
@@ -381,10 +479,18 @@ function handleWebSocketMessage(data) {
             
             // Determinar correctamente si este cliente ganó la partida
             // El ganador es "player1" (winner=1) o "player2" (winner=2)
-            // Necesitamos comprobar si nuestro ID corresponde al ganador
             const currentId = getUserId();
             const winningPlayerId = winner === 1 ? data.player1_id : data.player2_id;
             const iWon = currentId === winningPlayerId;
+            
+            // Obtener el nombre del jugador actual y del oponente
+            let myName = myPlayerNumber === 1 ? 
+                (player1Data ? player1Data.intra_login : 'Jugador 1') : 
+                (player2Data ? player2Data.intra_login : 'Jugador 2');
+                
+            let opponentName = myPlayerNumber === 1 ? 
+                (player2Data ? player2Data.intra_login : 'Jugador 2') : 
+                (player1Data ? player1Data.intra_login : 'Jugador 1');
             
             if (winner === 0) {
                 gameOverMessage = data.message || 'La partida ha terminado';
@@ -392,7 +498,7 @@ function handleWebSocketMessage(data) {
                 if (iWon) {
                     gameOverMessage = '¡Has ganado! 🎉';
                 } else {
-                    gameOverMessage = 'Has perdido. ¡Mejor suerte la próxima vez!';
+                    gameOverMessage = `¡${opponentName} ha ganado! Mejor suerte la próxima vez.`;
                 }
             }
             
@@ -403,7 +509,6 @@ function handleWebSocketMessage(data) {
                     <h3 class="text-center">¡Fin del juego!</h3>
                     <p class="text-center">${gameOverMessage}</p>
                     <p class="text-center">Puntuación final: ${player1Score} - ${player2Score}</p>
-                    <button class="btn btn-primary mt-3" onclick="window.location.reload()">Jugar de nuevo</button>
                 `;
                 endGameMessage.classList.remove('d-none');
             }
@@ -430,7 +535,6 @@ function handleWebSocketMessage(data) {
                 errorMessage.innerHTML = `
                     <h3 class="text-center">Error</h3>
                     <p class="text-center">${data.message}</p>
-                    <button class="btn btn-primary mt-3" onclick="window.location.reload()">Reintentar</button>
                 `;
                 errorMessage.classList.remove('d-none');
             }
@@ -570,15 +674,15 @@ function setupPongButtons() {
         const newButton = playOnlineBtn.cloneNode(true);
         playOnlineBtn.parentNode.replaceChild(newButton, playOnlineBtn);
         
-        newButton.addEventListener('click', function() {
+        newButton.addEventListener('click', async function() {
             console.log("[DEBUG] Botón 'Jugar Online' pulsado.");
             
-            // Limpiar cualquier estado previo
-            cleanupOnlineGame();
+            // Limpiar cualquier estado previo completamente
+            await cleanupOnlineGame();
             
             // Si existe una función de limpieza para el juego local, llamarla
             if (typeof cleanupLocalGame === 'function') {
-                cleanupLocalGame();
+                await cleanupLocalGame();
             }
             
             const gameContainer = document.getElementById('game-container');
@@ -611,11 +715,11 @@ function setupPongButtons() {
         const newButton = playLocalBtn.cloneNode(true);
         playLocalBtn.parentNode.replaceChild(newButton, playLocalBtn);
         
-        newButton.addEventListener('click', function() {
+        newButton.addEventListener('click', async function() {
             console.log("[DEBUG] Botón 'Jugar Local' pulsado.");
             
             // Limpiar cualquier estado de juego online previo
-            cleanupOnlineGame();
+            await cleanupOnlineGame();
             
             const gameContainer = document.getElementById('game-container');
             if (gameContainer) {
