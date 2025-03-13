@@ -170,52 +170,43 @@ class PongConsumer(AsyncWebsocketConsumer):
             game_data = active_games[room_id]
             paddle_height = 0.2  # Altura de la paleta en unidades normalizadas
             base_speed = 0.015   # Velocidad base para cálculos
-            
-            # Frecuencia de actualización más alta para movimientos más suaves
             update_interval = 0.02  # 20ms = 50 FPS
-            
+
             while room_id in active_games:
                 # Actualizar posición de la pelota
                 game_data['ball_x'] += game_data['ball_dx']
                 game_data['ball_y'] += game_data['ball_dy']
                 
-                # Rebote en paredes superior e inferior - más dinámico
+                # Rebote en paredes superior e inferior
                 if game_data['ball_y'] <= 0 or game_data['ball_y'] >= 1:
-                    game_data['ball_dy'] = -game_data['ball_dy'] * 1.02  # Ligero aumento de velocidad en rebotes
-                    # Corregir posición para evitar quedarse fuera de los límites
+                    game_data['ball_dy'] = -game_data['ball_dy'] * 1.02
                     game_data['ball_y'] = max(0.01, min(0.99, game_data['ball_y']))
                 
-                # Colisión con paleta izquierda - ajustada para mejor correspondencia visual
-                if (game_data['ball_x'] <= 0.02 and  # Cambiado de 0.05 a 0.03
-                    game_data['ball_x'] >= -0.01 and  # Permitir un poco de tolerancia negativa para conexiones lentas
+                # Colisión con paleta izquierda
+                if (game_data['ball_x'] <= 0.02 and
+                    game_data['ball_x'] >= -0.01 and
                     game_data['ball_y'] >= game_data['left_paddle'] - paddle_height/2 and 
                     game_data['ball_y'] <= game_data['left_paddle'] + paddle_height/2):
                     
-                    game_data['ball_dx'] = -game_data['ball_dx'] * 1.1  # Mayor aceleración
-                    game_data['ball_x'] = 0.02  # Ajustar a la misma distancia que la condición
-                    
-                    # Cambiar dirección vertical según dónde golpea la paleta - efecto más pronunciado
+                    game_data['ball_dx'] = -game_data['ball_dx'] * 1.1
+                    game_data['ball_x'] = 0.02
                     relative_intersection = (game_data['ball_y'] - game_data['left_paddle']) / (paddle_height/2)
                     game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
                 
-                # Colisión con paleta derecha - ajustada para mejor correspondencia visual
-                if (game_data['ball_x'] >= 0.99 and  # Cambiado de 0.95 a 0.97
-                    game_data['ball_x'] <= 1.01 and  # Permitir un poco de tolerancia positiva para conexiones lentas
+                # Colisión con paleta derecha
+                if (game_data['ball_x'] >= 0.99 and
+                    game_data['ball_x'] <= 1.01 and
                     game_data['ball_y'] >= game_data['right_paddle'] - paddle_height/2 and 
                     game_data['ball_y'] <= game_data['right_paddle'] + paddle_height/2):
                     
-                    game_data['ball_dx'] = -game_data['ball_dx'] * 1.1  # Mayor aceleración
-                    game_data['ball_x'] = 0.99  # Ajustar a la misma distancia que la condición
-                    
-                    # Cambiar dirección vertical según dónde golpea la paleta - efecto más pronunciado
+                    game_data['ball_dx'] = -game_data['ball_dx'] * 1.1
+                    game_data['ball_x'] = 0.99
                     relative_intersection = (game_data['ball_y'] - game_data['right_paddle']) / (paddle_height/2)
                     game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
                 
                 # Punto para jugador 2 (pelota sale por la izquierda)
                 if game_data['ball_x'] < 0:
                     game_data['player2_score'] += 1
-                    
-                    # Enviar actualización de puntuación
                     await self.channel_layer.group_send(
                         room_id,
                         {
@@ -224,21 +215,15 @@ class PongConsumer(AsyncWebsocketConsumer):
                             'player2_score': game_data['player2_score']
                         }
                     )
-                    
-                    # Reiniciar posición de la pelota con velocidad aumentada
                     game_data['ball_x'] = 0.5
                     game_data['ball_y'] = 0.5
                     game_data['ball_dx'] = base_speed * random.choice([-1, 1])
                     game_data['ball_dy'] = base_speed * 0.8 * random.choice([-1, 1])
-                    
-                    # Pausa breve antes de continuar
                     await asyncio.sleep(1)
                 
                 # Punto para jugador 1 (pelota sale por la derecha)
                 if game_data['ball_x'] > 1:
                     game_data['player1_score'] += 1
-                    
-                    # Enviar actualización de puntuación
                     await self.channel_layer.group_send(
                         room_id,
                         {
@@ -247,21 +232,15 @@ class PongConsumer(AsyncWebsocketConsumer):
                             'player2_score': game_data['player2_score']
                         }
                     )
-                    
-                    # Reiniciar posición de la pelota con velocidad aumentada
                     game_data['ball_x'] = 0.5
                     game_data['ball_y'] = 0.5
                     game_data['ball_dx'] = base_speed * random.choice([-1, 1])
                     game_data['ball_dy'] = base_speed * 0.8 * random.choice([-1, 1])
-                    
-                    # Pausa breve antes de continuar
                     await asyncio.sleep(1)
                 
-                # Verificar si algún jugador ha ganado (p.ej. llega a 5 puntos)
-                if game_data['player1_score'] >= 5 or game_data['player2_score'] >= 5:
-                    winner = 1 if game_data['player1_score'] >= 5 else 2
-                    
-                    # Enviar mensaje de fin de juego con IDs de jugadores que ya están almacenados
+                # Verificar si algún jugador ha ganado
+                if game_data['player1_score'] >= 3 or game_data['player2_score'] >= 3:
+                    winner = 1 if game_data['player1_score'] >= 3 else 2
                     await self.channel_layer.group_send(
                         room_id,
                         {
@@ -273,11 +252,8 @@ class PongConsumer(AsyncWebsocketConsumer):
                             'player2_score': game_data['player2_score']
                         }
                     )
-                    
-                    # Guardar los resultados en la base de datos
                     await self.save_game_results(room_id, game_data)
-                    
-                    # Limpiar los datos del juego
+                    # Eliminar el juego de active_games solo al finalizar oficialmente
                     if room_id in active_games:
                         del active_games[room_id]
                     return
@@ -292,18 +268,16 @@ class PongConsumer(AsyncWebsocketConsumer):
                     }
                 )
                 
-                # Esperar un tiempo más corto para actualizaciones más frecuentes
                 await asyncio.sleep(update_interval)
-                
+                    
         except asyncio.CancelledError:
-            # Tarea cancelada, limpiar
-            if room_id in active_games:
-                del active_games[room_id]
+            # No eliminamos active_games aquí, lo dejamos para player_disconnected
+            print(f"[DEBUG] Tarea de movimiento de pelota cancelada para {room_id}")
         except Exception as e:
             print(f"[ERROR] Error en move_ball: {e}")
             if room_id in active_games:
                 del active_games[room_id]
-    
+
     @database_sync_to_async
     def save_game_results(self, room_id, game_data):
         """
@@ -466,13 +440,31 @@ class PongConsumer(AsyncWebsocketConsumer):
         
     async def player_disconnected(self, event):
         """
-        Notifica a los demás jugadores que un jugador se ha desconectado.
+        Notifica a los demás jugadores que un jugador se ha desconectado, solo si el juego está activo.
         """
         print(f"[DEBUG] Notificando desconexión del jugador {event['player_id']}")
-        await self.send(text_data=json.dumps({
-            'type': 'error',
-            'message': 'El otro jugador se ha desconectado'
-        }))
+        
+        # Verificar si hay una sala asignada
+        if hasattr(self, 'room_id') and self.room_id:
+            # Si el juego está en active_games, significa que está activo
+            if self.room_id in active_games:
+                print(f"[DEBUG] El juego en {self.room_id} está activo, notificando desconexión")
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'El otro jugador se ha desconectado'
+                }))
+                
+                # Cancelar la tarea de la pelota y limpiar el juego
+                if 'ball_task' in active_games[self.room_id]:
+                    active_games[self.room_id]['ball_task'].cancel()
+                    print(f"[DEBUG] Tarea de movimiento de pelota cancelada para {self.room_id}")
+                if self.room_id in active_games:
+                    del active_games[self.room_id]
+                    print(f"[DEBUG] Juego {self.room_id} eliminado de active_games debido a desconexión")
+            else:
+                print(f"[DEBUG] No se envía error: la partida en {self.room_id} ya terminó")
+        else:
+            print(f"[DEBUG] No se envía error: no hay room_id asignado")
     
     async def game_over(self, event):
         """
