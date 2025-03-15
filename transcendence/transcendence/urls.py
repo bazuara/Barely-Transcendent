@@ -31,4 +31,5 @@ urlpatterns = [
     # Añadir ruta para actualizar perfil
     path('profile/update/', update_profile, name='update_profile'),
     path('profile/anonimize/', anonimize, name='anonimize'),
+    path("prometheus/", include("django_prometheus.urls")),
 ]
