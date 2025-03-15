@@ -6,13 +6,17 @@ astroid==3.3.8
 autopep8==2.3.2
 beautifulsoup4==4.13.3
 certifi==2025.1.31
+channels==4.2.0
+channels_redis==4.2.1
 charset-normalizer==3.4.1
 click==8.1.8
 colorama==0.4.6
 cssbeautifier==1.15.3
+daphne==4.1.2
 dill==0.3.9
 django-bootstrap-v5==1.0.11
 django-htmx==1.22.0
+django-prometheus==2.3.1
 django-websocket-redis==0.6.0
 djlint==1.36.4
 dotenv==0.9.9
@@ -36,6 +40,4 @@ tomlkit==0.13.2
 tqdm==4.67.1
 typing_extensions==4.12.2
 urllib3==2.3.0
-channels==4.2.0
-daphne==4.1.2
-channels_redis==4.2.1
+whitenoise==6.9.0
