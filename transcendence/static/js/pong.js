@@ -1,4 +1,20 @@
+// Variables globales para tracking del estado del juego
+let animationFrameId = null;
+let gameKeyDownHandler = null;
+let gameKeyUpHandler = null;
+let gameResizeHandler = null;
+let isGameInitialized = false;
+
 function initPongGame() {
+    console.log("[DEBUG] Iniciando juego local...");
+    
+    // Asegurarse de limpiar cualquier estado previo
+    cleanupLocalGame();
+    cleanupOnlineGame();
+    
+    // Marcar que el juego está inicializándose
+    isGameInitialized = true;
+    
     // Constantes del juego
     const PADDLE_HEIGHT = 100;
     const PADDLE_WIDTH = 15;
@@ -18,14 +34,61 @@ function initPongGame() {
     let gameOver = false;
     let winner = null;
 
+    // Definir los manejadores de eventos para poder eliminarlos después
+    gameKeyDownHandler = function(event) {
+        keysPressed[event.key] = true;
+        
+        // Prevenir el comportamiento predeterminado de las flechas arriba y abajo
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
+        }
+        
+        if ((event.key === ' ' || event.key === 'Spacebar') && !gameOver) {
+            event.preventDefault();
+            if (!gameRunning) {
+                gameRunning = true;
+                document.getElementById('game-message').classList.add('d-none');
+                gameLoop();
+            } else {
+                gameRunning = false;
+                document.getElementById('game-message').classList.remove('d-none');
+                document.getElementById('game-message').innerHTML = '<h3 class="text-center">Pausa</h3><p class="text-center mb-0">Presiona ESPACIO para continuar</p>';
+            }
+        }
+    };
+    
+    gameKeyUpHandler = function(event) {
+        keysPressed[event.key] = false;
+    };
+    
+    gameResizeHandler = function() {
+        if (canvas) {
+            const container = canvas.parentElement;
+            if (container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                
+                // Redibujar el estado actual si el juego está pausado
+                if (!gameRunning && isGameInitialized) {
+                    draw();
+                }
+            }
+        }
+    };
+
     // Inicializar el juego
     function init() {
         canvas = document.getElementById('pong-canvas');
+        if (!canvas) {
+            console.error("[ERROR] No se encontró el elemento canvas");
+            return;
+        }
+        
         ctx = canvas.getContext('2d');
         
         // Configurar el canvas
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
+        gameResizeHandler();
+        window.addEventListener('resize', gameResizeHandler);
         
         // Inicializar posiciones
         resetPositions();
@@ -34,23 +97,18 @@ function initPongGame() {
         canvas.tabIndex = 1000;
         canvas.focus();
         
-        // Configurar eventos de teclado
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
+        // Configurar eventos de teclado (guardando referencias para limpieza posterior)
+        window.addEventListener('keydown', gameKeyDownHandler);
+        window.addEventListener('keyup', gameKeyUpHandler);
         
         // Renderizar el estado inicial
         draw();
     }
 
-    // Redimensionar el canvas
-    function resizeCanvas() {
-        const container = canvas.parentElement;
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-    }
-
     // Reiniciar posiciones
     function resetPositions() {
+        if (!canvas) return;
+        
         player1Y = canvas.height / 2 - PADDLE_HEIGHT / 2;
         player2Y = canvas.height / 2 - PADDLE_HEIGHT / 2;
         ballX = canvas.width / 2;
@@ -63,13 +121,14 @@ function initPongGame() {
 
     // Bucle principal del juego
     function gameLoop() {
-        if (!gameRunning) return;
+        // Si el juego no está en ejecución o ya no está inicializado, salir
+        if (!gameRunning || !isGameInitialized) return;
         
         update();
         draw();
         
-        if (!gameOver) {
-            requestAnimationFrame(gameLoop);
+        if (!gameOver && isGameInitialized) {
+            animationFrameId = requestAnimationFrame(gameLoop);
         }
     }
 
@@ -142,6 +201,8 @@ function initPongGame() {
 
     // Dibujar el estado del juego
     function draw() {
+        if (!ctx || !canvas) return;
+        
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -164,8 +225,13 @@ function initPongGame() {
 
     // Actualizar la puntuación en la interfaz
     function updateScoreDisplay() {
-        document.getElementById('player1-score').textContent = player1Score;
-        document.getElementById('player2-score').textContent = player2Score;
+        const score1Element = document.getElementById('player1-score');
+        const score2Element = document.getElementById('player2-score');
+        
+        if (score1Element && score2Element) {
+            score1Element.textContent = player1Score;
+            score2Element.textContent = player2Score;
+        }
     }
 
     // Verificar si hay un ganador
@@ -183,18 +249,21 @@ function initPongGame() {
 
     // Mostrar el mensaje de fin de partida
     function showGameOver() {
-        document.getElementById('game-message').classList.remove('d-none');
-        document.getElementById('game-message').innerHTML = `
-            <h3 class="text-center">¡Fin del Juego!</h3>
-            <p class="text-center">Jugador ${winner} Gana ${player1Score}-${player2Score}</p>
-            <button id="restart-btn" class="btn btn-primary d-block mx-auto mt-2">Jugar de Nuevo</button>
-        `;
-        
-        const restartBtn = document.getElementById('restart-btn');
-        if (restartBtn) {
-            restartBtn.addEventListener('click', function() {
-                restartGame();
-            });
+        const gameMessage = document.getElementById('game-message');
+        if (gameMessage) {
+            gameMessage.classList.remove('d-none');
+            gameMessage.innerHTML = `
+                <h3 class="text-center">¡Fin del Juego!</h3>
+                <p class="text-center">Jugador ${winner} Gana ${player1Score}-${player2Score}</p>
+                <button id="restart-btn" class="btn btn-primary d-block mx-auto mt-2">Jugar de Nuevo</button>
+            `;
+            
+            const restartBtn = document.getElementById('restart-btn');
+            if (restartBtn) {
+                restartBtn.addEventListener('click', function() {
+                    restartGame();
+                });
+            }
         }
     }
 
@@ -208,39 +277,73 @@ function initPongGame() {
         gameRunning = false;
         winner = null;
         
-        document.getElementById('game-message').innerHTML = '<h3 class="text-center">¿Listo?</h3><p class="text-center mb-0">Presiona ESPACIO para comenzar</p>';
-    }
-
-    // Manejar eventos de teclado
-    function handleKeyDown(event) {
-        keysPressed[event.key] = true;
-        
-        // Prevenir el comportamiento predeterminado de las flechas arriba y abajo
-        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            event.preventDefault();
+        const gameMessage = document.getElementById('game-message');
+        if (gameMessage) {
+            gameMessage.innerHTML = '<h3 class="text-center">¿Listo?</h3><p class="text-center mb-0">Presiona ESPACIO para comenzar</p>';
         }
-        
-        if ((event.key === ' ' || event.key === 'Spacebar') && !gameOver) {
-            event.preventDefault();
-            if (!gameRunning) {
-                gameRunning = true;
-                document.getElementById('game-message').classList.add('d-none');
-                gameLoop();
-            } else {
-                gameRunning = false;
-                document.getElementById('game-message').classList.remove('d-none');
-                document.getElementById('game-message').innerHTML = '<h3 class="text-center">Pausa</h3><p class="text-center mb-0">Presiona ESPACIO para continuar</p>';
-            }
-        }
-    }
-
-    function handleKeyUp(event) {
-        keysPressed[event.key] = false;
     }
 
     // Iniciar el juego
     init();
 }
 
-// Exportar la función para que pueda ser llamada desde fuera
+// Función para limpiar el estado del juego local
+function cleanupLocalGame() {
+    console.log("[DEBUG] Limpiando estado del juego local...");
+    
+    // Marcar el juego como no inicializado para detener cualquier loop activo
+    isGameInitialized = false;
+    
+    // Cancelar el bucle de animación si está activo
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+        console.log("[DEBUG] Animación cancelada");
+    }
+    
+    // Eliminar los event listeners específicos del juego
+    if (gameKeyDownHandler) {
+        window.removeEventListener('keydown', gameKeyDownHandler);
+        gameKeyDownHandler = null;
+        console.log("[DEBUG] Event listener keydown eliminado");
+    }
+    
+    if (gameKeyUpHandler) {
+        window.removeEventListener('keyup', gameKeyUpHandler);
+        gameKeyUpHandler = null;
+        console.log("[DEBUG] Event listener keyup eliminado");
+    }
+    
+    if (gameResizeHandler) {
+        window.removeEventListener('resize', gameResizeHandler);
+        gameResizeHandler = null;
+        console.log("[DEBUG] Event listener resize eliminado");
+    }
+    
+    // Resetear las puntuaciones en la interfaz
+    const score1Element = document.getElementById('player1-score');
+    const score2Element = document.getElementById('player2-score');
+    if (score1Element && score2Element) {
+        score1Element.textContent = "0";
+        score2Element.textContent = "0";
+    }
+    
+    // Limpiar el canvas si existe
+    const canvas = document.getElementById('pong-canvas');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log("[DEBUG] Canvas limpiado");
+        }
+    }
+    
+    console.log("[DEBUG] Limpieza del juego local completada");
+    
+    // Devolver una promesa resuelta para poder usar await
+    return Promise.resolve();
+}
+
+// Exportar las funciones para que puedan ser llamadas desde fuera
 window.initPongGame = initPongGame;
+window.cleanupLocalGame = cleanupLocalGame;

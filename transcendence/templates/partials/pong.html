@@ -1,3 +1,4 @@
+{% load static %}
 <div class="container py-4">
     <div class="row mb-3">
         <div class="col-12 text-center">
@@ -95,53 +96,112 @@
     // Establecer el ID del usuario actual para que el juego lo use
     window.currentUserId = {{ user.internal_id }};
     
-    // Asegúrate de que este script se ejecute después de cargar la página
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log("DOM fully loaded");
-        console.log("Current user ID:", window.currentUserId);
-
+    // Cargar dinámicamente los scripts si las funciones no están disponibles
+    function loadScriptsIfNeeded(callback) {
+        // Verificar directamente si las funciones ya están disponibles
+        if (typeof initPongGame === 'function' && typeof initOnlineGame === 'function') {
+            console.log("Las funciones de Pong ya están disponibles, no necesitamos cargar scripts");
+            callback();
+            return;
+        }
+        
+        // Prevenir carga duplicada añadiendo una variable global para rastreo
+        if (window.pongScriptsLoading) {
+            console.log("Los scripts de Pong ya se están cargando en otra instancia");
+            
+            // Esperar a que los scripts terminen de cargarse (verificar cada 100ms)
+            const checkScripts = setInterval(function() {
+                if (typeof initPongGame === 'function' && typeof initOnlineGame === 'function') {
+                    clearInterval(checkScripts);
+                    console.log("Scripts cargados por otra instancia, continuando...");
+                    callback();
+                }
+            }, 100);
+            
+            return;
+        }
+        
+        // Marcar que los scripts se están cargando
+        window.pongScriptsLoading = true;
+        
+        console.log("Cargando scripts de Pong dinámicamente");
+        
+        // Cargar el contenido de los scripts manualmente y evaluarlo
+        fetch("{% static 'js/pong.js' %}")
+            .then(response => response.text())
+            .then(scriptText => {
+                // Evaluar el contenido del script en un contexto controlado
+                (new Function(scriptText))();
+                console.log("pong.js cargado y evaluado");
+                
+                // Ahora cargar pong-online.js
+                return fetch("{% static 'js/pong-online.js' %}");
+            })
+            .then(response => response.text())
+            .then(scriptText => {
+                // Evaluar el contenido del script en un contexto controlado
+                (new Function(scriptText))();
+                console.log("pong-online.js cargado y evaluado");
+                
+                // Completado
+                window.pongScriptsLoading = false;
+                setTimeout(callback, 50);
+            })
+            .catch(error => {
+                console.error("Error cargando scripts:", error);
+                window.pongScriptsLoading = false;
+            });
+    }
+    
+    // Función para configurar los botones
+    function setupPongButtons() {
+        console.log("Configurando botones de Pong");
+        
         // Configurar el botón de juego local
         const playLocalBtn = document.getElementById('play-local-btn');
         if (playLocalBtn) {
-            playLocalBtn.addEventListener('click', function() {
+            // Quitar listeners previos si existen (clonando el botón)
+            const newLocalBtn = playLocalBtn.cloneNode(true);
+            playLocalBtn.parentNode.replaceChild(newLocalBtn, playLocalBtn);
+            
+            newLocalBtn.addEventListener('click', function() {
                 console.log("Local play button clicked");
-                // Mostrar el canvas y mensaje de inicio
                 document.getElementById('game-container').classList.remove('d-none');
                 document.getElementById('game-message').classList.remove('d-none');
                 
-                // Iniciar el juego (con un pequeño retraso para asegurar que el DOM está actualizado)
                 setTimeout(function() {
                     if (typeof initPongGame === 'function') {
                         initPongGame();
                     } else {
-                        console.error("initPongGame function not found. Is pong.js loaded properly?");
+                        console.error("initPongGame function not found");
                     }
                 }, 100);
             });
-        } else {
-            console.error("Play local button not found");
         }
-
+        
         // Configurar el botón de juego online
         const playOnlineBtn = document.getElementById('play-online-btn');
         if (playOnlineBtn) {
-            playOnlineBtn.addEventListener('click', function() {
+            // Quitar listeners previos si existen (clonando el botón)
+            const newOnlineBtn = playOnlineBtn.cloneNode(true);
+            playOnlineBtn.parentNode.replaceChild(newOnlineBtn, playOnlineBtn);
+            
+            newOnlineBtn.addEventListener('click', function() {
                 console.log("Online play button clicked");
-                // Mostrar el canvas y mensaje de inicio
                 document.getElementById('game-container').classList.remove('d-none');
                 document.getElementById('game-message').classList.remove('d-none');
                 
-                // Iniciar el juego online (con un pequeño retraso para asegurar que el DOM está actualizado)
                 setTimeout(function() {
                     if (typeof initOnlineGame === 'function') {
                         initOnlineGame();
                     } else {
-                        console.error("initOnlineGame function not found. Is pong-online.js loaded properly?");
+                        console.error("initOnlineGame function not found");
                     }
                 }, 100);
             });
-        } else {
-            console.error("Play online button not found");
         }
-    });
+    }
+    
+    // Cargar scripts si es necesario y luego configurar botones
+    loadScriptsIfNeeded(setupPongButtons);
 </script>
