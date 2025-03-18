@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_head %}
+    <!-- <link rel="stylesheet" href="{% static 'css/pong.css' %}"> # esto lo dejo para mas tarde si me apetece -- > 
+{% endblock %}
+
+{% block content %}
+    {% include "partials/pong.html" %}
+{% endblock content %}
+
+{% block extra_scripts %}
+    <script>
+        // Establecer el ID del usuario para que el juego lo use
+        window.currentUserId = {{ user.internal_id }};
+    </script>
+    <script src="{% static 'js/pong.js' %}"></script>
+    <script src="{% static 'js/pong-online.js' %}"></script>
+{% endblock %}

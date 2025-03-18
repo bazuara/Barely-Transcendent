@@ -2,7 +2,6 @@ from django.shortcuts import render, redirect
 from users.models import User
 from django.utils import timezone
 
-
 def home(request):
     # Obtener el ID del usuario de la sesión
     user_id = request.session.get('user_id')
@@ -25,7 +24,16 @@ def home(request):
 
     return render(request, template)
 
-
 def about(request):
     template = "partials/about.html" if request.htmx else "about.html"
     return render(request, template)
+
+def pong(request):
+    # Verificar si el usuario está autenticado
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return redirect('login')
+    
+    template = "partials/pong.html" if request.htmx else "pong.html"
+    return render(request, template)
+

@@ -53,8 +53,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
-    'channels',
     'users',
+    'pong',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -66,7 +67,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    # 'users.middleware.AuthRequiredMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', # Whitenoise para servir archivos estáticos
+    #'users.middleware.AuthRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'transcendence.urls'
@@ -89,7 +91,7 @@ TEMPLATES = [
 ]
 
 ASGI_APPLICATION = 'transcendence.asgi.application'
-
+WSGI_APPLICATION = 'transcendence.wsgi.application'
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -160,7 +162,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
