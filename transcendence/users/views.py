@@ -1,9 +1,11 @@
 import requests
 from django.shortcuts import render, redirect
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseServerError, JsonResponse
 from .models import User
 from django.utils import timezone
+from django.contrib.auth import login as auth_login # para el fake login
+
 
 # oauth_url = (
 #    "https://api.intra.42.fr/oauth/authorize"
@@ -18,13 +20,11 @@ def profile(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return redirect('login')
-
     # Obtener el usuario
     try:
         user = User.objects.get(internal_id=user_id)
     except User.DoesNotExist:
         return redirect('login')
-
     # Renderizar la plantilla adecuada según si es una solicitud HTMX o no
     template = "partials/profile.html" if request.htmx else "profile.html"
     return render(request, template, {'user': user})
@@ -35,7 +35,6 @@ def update_profile(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return JsonResponse({'status': 'error', 'message': 'No estás autenticado'}, status=401)
-
     # Obtener el usuario
     try:
         user = User.objects.get(internal_id=user_id)
@@ -164,6 +163,18 @@ def logout(request):
     request.session.flush()
     return redirect('login')
 
+
+# Endpoint para simular el inicio de sesión durante las pruebas
+def mock_login(request):
+    # Obtén el usuario de prueba
+    user = User.objects.filter(intra_login="Test").first()
+
+    if user:
+        # Simula la autenticación manualmente
+        request.session['user_id'] = user.internal_id  # Guarda el ID del usuario en la sesión
+        return JsonResponse({"status": "success", "message": "Mock login successful"})
+    else:
+        return JsonResponse({"status": "error", "message": "User not found"}, status=400)
 
 def anonimize(request):
     # Obtener el ID del usuario de la sesión

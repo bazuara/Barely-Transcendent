@@ -1,0 +1,207 @@
+{% load static %}
+<div class="container py-4">
+    <div class="row mb-3">
+        <div class="col-12 text-center">
+            <h1 class="display-4">Pong</h1>
+            <p class="lead">¡Demuestra tus habilidades en este clásico juego!</p>
+        </div>
+    </div>
+    
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="d-grid">
+                <button id="play-local-btn" class="btn btn-primary btn-lg" >Jugar Local</button>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="d-grid">
+                <button id="play-online-btn" class="btn btn-success btn-lg" >Jugar Online</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row justify-content-center mb-4">
+        <div class="col-12 col-lg-8">
+            <!-- Contenedor del juego con relación de aspecto 4:3 -->
+            <div id="game-container" class="d-none">
+                <!-- Información de los jugadores -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <!-- Jugador Izquierda -->
+                    <div id="player1-info" class="d-flex align-items-center">
+                        <img id="player1-avatar" src="" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+                        <span id="player1-name" class="fw-bold"></span>
+                    </div>
+                    
+                    <!-- Estado del juego -->
+                    <div id="game-status" class="text-center">
+                        <span class="badge bg-primary">VS</span>
+                    </div>
+                    
+                    <!-- Jugador Derecha -->
+                    <div id="player2-info" class="d-flex align-items-center justify-content-end">
+                        <span id="player2-name" class="fw-bold"></span>
+                        <img id="player2-avatar" src="" alt="Avatar" class="rounded-circle ms-2" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+                    </div>
+                </div>
+                
+                <div class="bg-dark rounded position-relative overflow-hidden" style="aspect-ratio: 4/3;">
+                    <canvas id="pong-canvas" class="w-100 h-100"></canvas>
+                    
+                    <!-- Puntajes -->
+                    <div class="position-absolute top-0 start-0 end-0 d-flex justify-content-between p-3">
+                        <h3 id="player1-score" class="text-white">0</h3>
+                        <h3 id="player2-score" class="text-white">0</h3>
+                    </div>
+                    
+                    <!-- Mensaje central -->
+                    <div id="game-message" class="position-absolute top-50 start-50 translate-middle text-white p-3 rounded bg-dark bg-opacity-75 d-none">
+                        <h3 class="text-center">¿Listo?</h3>
+                        <p class="text-center mb-0">Presiona ESPACIO para comenzar</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row" id="instructions-section">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h3 class="mb-0">Instrucciones</h3>
+                </div>
+                <div class="card-body">
+                    <h5>Objetivo del juego</h5>
+                    <p>Ser el primero en ganar 3 puntos enviando la pelota más allá de la paleta de tu oponente.</p>
+                    
+                    <h5>Controles</h5>
+                    <ul>
+                        <li><strong>Jugador 1 (izquierda):</strong> Teclas W (arriba) y S (abajo)</li>
+                        <li><strong>Jugador 2 (derecha):</strong> Teclas flecha arriba y flecha abajo</li>
+                        <li><strong>Iniciar/Pausar:</strong> Tecla ESPACIO</li>
+                    </ul>
+                    
+                    <h5>Reglas</h5>
+                    <p>La pelota rebota en las paredes superior e inferior y en las paletas de los jugadores. Cuando un jugador falla al devolver la pelota, el oponente gana un punto.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        ¡El primero en alcanzar 3 puntos gana la partida!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Establecer el ID del usuario actual para que el juego lo use
+    window.currentUserId = {{ user.internal_id }};
+    
+    // Cargar dinámicamente los scripts si las funciones no están disponibles
+    function loadScriptsIfNeeded(callback) {
+        // Verificar directamente si las funciones ya están disponibles
+        if (typeof initPongGame === 'function' && typeof initOnlineGame === 'function') {
+            console.log("Las funciones de Pong ya están disponibles, no necesitamos cargar scripts");
+            callback();
+            return;
+        }
+        
+        // Prevenir carga duplicada añadiendo una variable global para rastreo
+        if (window.pongScriptsLoading) {
+            console.log("Los scripts de Pong ya se están cargando en otra instancia");
+            
+            // Esperar a que los scripts terminen de cargarse (verificar cada 100ms)
+            const checkScripts = setInterval(function() {
+                if (typeof initPongGame === 'function' && typeof initOnlineGame === 'function') {
+                    clearInterval(checkScripts);
+                    console.log("Scripts cargados por otra instancia, continuando...");
+                    callback();
+                }
+            }, 100);
+            
+            return;
+        }
+        
+        // Marcar que los scripts se están cargando
+        window.pongScriptsLoading = true;
+        
+        console.log("Cargando scripts de Pong dinámicamente");
+        
+        // Cargar el contenido de los scripts manualmente y evaluarlo
+        fetch("{% static 'js/pong.js' %}")
+            .then(response => response.text())
+            .then(scriptText => {
+                // Evaluar el contenido del script en un contexto controlado
+                (new Function(scriptText))();
+                console.log("pong.js cargado y evaluado");
+                
+                // Ahora cargar pong-online.js
+                return fetch("{% static 'js/pong-online.js' %}");
+            })
+            .then(response => response.text())
+            .then(scriptText => {
+                // Evaluar el contenido del script en un contexto controlado
+                (new Function(scriptText))();
+                console.log("pong-online.js cargado y evaluado");
+                
+                // Completado
+                window.pongScriptsLoading = false;
+                setTimeout(callback, 50);
+            })
+            .catch(error => {
+                console.error("Error cargando scripts:", error);
+                window.pongScriptsLoading = false;
+            });
+    }
+    
+    // Función para configurar los botones
+    function setupPongButtons() {
+        console.log("Configurando botones de Pong");
+        
+        // Configurar el botón de juego local
+        const playLocalBtn = document.getElementById('play-local-btn');
+        if (playLocalBtn) {
+            // Quitar listeners previos si existen (clonando el botón)
+            const newLocalBtn = playLocalBtn.cloneNode(true);
+            playLocalBtn.parentNode.replaceChild(newLocalBtn, playLocalBtn);
+            
+            newLocalBtn.addEventListener('click', function() {
+                console.log("Local play button clicked");
+                document.getElementById('game-container').classList.remove('d-none');
+                document.getElementById('game-message').classList.remove('d-none');
+                
+                setTimeout(function() {
+                    if (typeof initPongGame === 'function') {
+                        initPongGame();
+                    } else {
+                        console.error("initPongGame function not found");
+                    }
+                }, 100);
+            });
+        }
+        
+        // Configurar el botón de juego online
+        const playOnlineBtn = document.getElementById('play-online-btn');
+        if (playOnlineBtn) {
+            // Quitar listeners previos si existen (clonando el botón)
+            const newOnlineBtn = playOnlineBtn.cloneNode(true);
+            playOnlineBtn.parentNode.replaceChild(newOnlineBtn, playOnlineBtn);
+            
+            newOnlineBtn.addEventListener('click', function() {
+                console.log("Online play button clicked");
+                document.getElementById('game-container').classList.remove('d-none');
+                document.getElementById('game-message').classList.remove('d-none');
+                
+                setTimeout(function() {
+                    if (typeof initOnlineGame === 'function') {
+                        initOnlineGame();
+                    } else {
+                        console.error("initOnlineGame function not found");
+                    }
+                }, 100);
+            });
+        }
+    }
+    
+    // Cargar scripts si es necesario y luego configurar botones
+    loadScriptsIfNeeded(setupPongButtons);
+</script>

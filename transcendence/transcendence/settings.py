@@ -56,12 +56,13 @@ INSTALLED_APPS = [
     'django_prometheus',
     'channels',
     'users',
+    'pong',
 ]
 
 MIDDLEWARE = [
-    "django_prometheus.middleware.PrometheusBeforeMiddleware",  # should be #1
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",  # Prometheus debe ser el primero
     'django.middleware.security.SecurityMiddleware',
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Whitenoise para servir archivos estáticos
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -69,7 +70,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    "django_prometheus.middleware.PrometheusAfterMiddleware",  # should be #last
+    "django_prometheus.middleware.PrometheusAfterMiddleware",  # Prometheus debe ser el último
     # 'users.middleware.AuthRequiredMiddleware',
 ]
 
@@ -93,7 +94,7 @@ TEMPLATES = [
 ]
 
 ASGI_APPLICATION = 'transcendence.asgi.application'
-
+WSGI_APPLICATION = 'transcendence.wsgi.application'
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
@@ -168,8 +169,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 STATICFILES_DIRS = [
-    # Ajusta la ruta para apuntar correctamente
-    os.path.join(BASE_DIR, '..', 'static'),
+    BASE_DIR / "static",
 ]
 
 # Default primary key field type
