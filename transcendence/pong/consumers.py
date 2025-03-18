@@ -207,13 +207,13 @@ class PongConsumer(AsyncWebsocketConsumer):
                     game_data['ball_y'] = max(0.01, min(0.99, game_data['ball_y']))
                 
                 # Colisión con paleta izquierda
-                if (game_data['ball_x'] <= 0.02 and
+                if (game_data['ball_x'] <= 0.025 and
                     game_data['ball_x'] >= -0.01 and
                     game_data['ball_y'] >= game_data['left_paddle'] - paddle_height/2 and 
                     game_data['ball_y'] <= game_data['left_paddle'] + paddle_height/2):
                     
                     game_data['ball_dx'] = -game_data['ball_dx'] * 1.1
-                    game_data['ball_x'] = 0.02
+                    game_data['ball_x'] = 0.025
                     relative_intersection = (game_data['ball_y'] - game_data['left_paddle']) / (paddle_height/2)
                     game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
                 
@@ -535,4 +535,3 @@ class PongConsumer(AsyncWebsocketConsumer):
         if has_won:
             user.games_won += 1
         user.save()
-        

@@ -1,6 +1,6 @@
 (() => {
 // Estado del juego para la versión online 
-    // (usamos diferentes nombres para evitar conflictos con pong.js)
+    // (encapsulo para evitar conflictos con pong.js)
     let canvas, ctx;
     let myPaddleY = 0.5;       // Mi paleta (siempre a la izquierda visualmente)
     let opponentPaddleY = 0.5; // Paleta del oponente (siempre a la derecha visualmente)
@@ -536,6 +536,10 @@
                     }));
                     console.log(`[DEBUG] Enviando estadísticas: jugador=${currentId}, puntos=${myScore}, victoria=${iWon}`);
                 }
+                // Limpiar la URL quitando el room_id
+                const cleanUrl = window.location.pathname; // Esto elimina los parámetros de consulta como ?room_id=xxx
+                window.history.pushState({}, '', cleanUrl);
+                console.log("[DEBUG] URL limpiada a:", cleanUrl);
                 break;
 
             case 'error':
