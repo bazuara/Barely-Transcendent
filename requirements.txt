@@ -20,6 +20,7 @@ dill==0.3.9
 Django==4.2.19
 django-bootstrap-v5==1.0.11
 django-htmx==1.22.0
+django-prometheus==2.3.1
 django-websocket-redis==0.6.0
 djlint==1.36.4
 dotenv==0.9.9

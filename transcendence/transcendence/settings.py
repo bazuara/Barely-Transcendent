@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-d1g8r#l8#dhl5^i!-wu07rk$xa9hwf1jj9g@gh!q9jyf6g^sgb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['devcontainer', 'localhost', '127.0.0.1']
 
 # 42 OAuth Settings
 OAUTH_42_CLIENT_ID = os.getenv("OAUTH_42_CLIENT_ID")
@@ -53,13 +53,16 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap5',
     'django_htmx',
+    'django_prometheus',
+    'channels',
     'users',
     'pong',
-    'channels',
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",  # Prometheus debe ser el primero
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Whitenoise para servir archivos estáticos
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -67,8 +70,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # Whitenoise para servir archivos estáticos
-    #'users.middleware.AuthRequiredMiddleware',
+    "django_prometheus.middleware.PrometheusAfterMiddleware",  # Prometheus debe ser el último
+    # 'users.middleware.AuthRequiredMiddleware',
 ]
 
 ROOT_URLCONF = 'transcendence.urls'
@@ -99,7 +102,7 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "BACKEND": "django_prometheus.cache.backends.redis.RedisCache",
         "CONFIG": {
             "hosts": [
                 {
@@ -118,7 +121,7 @@ CHANNEL_LAYERS = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django_prometheus.db.backends.postgresql',
         'NAME': 'postgres',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
@@ -162,7 +165,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -171,3 +176,6 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# PROMETHEUS CONFIG
+PROMETHEUS_EXPORT_MIGRATIONS = True

@@ -33,9 +33,35 @@ services:
     networks:
       - barely_a_network
 
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - barely_a_network
+    depends_on:
+      - devcontainer
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ../grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    networks:
+      - barely_a_network
+    depends_on:
+      - prometheus
+
 networks:
   barely_a_network:
     driver: bridge
 
 volumes:
   postgres-data:
+  grafana-data:

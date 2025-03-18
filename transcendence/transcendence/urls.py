@@ -32,4 +32,5 @@ urlpatterns = [
     path('pong/', views.pong, name='pong'),
     path('mock-login/', mock_login, name='mock_login'),
     path('profile/anonimize/', anonimize, name='anonimize'),
+    path("prometheus/", include("django_prometheus.urls")),
 ]

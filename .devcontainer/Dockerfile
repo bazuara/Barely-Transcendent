@@ -5,6 +5,7 @@ RUN apt-get update \
 		iputils-ping \
 		git \
 		ssh \
+		curl \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Set environment variables 
