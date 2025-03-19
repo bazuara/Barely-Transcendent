@@ -100,9 +100,27 @@ REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
+"""
+# Este provoca fallos en pong multijugador, en su lugar usamos el de debajo.
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "django_prometheus.cache.backends.redis.RedisCache",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "host": REDIS_HOST,
+                    "port": REDIS_PORT,
+                    "password": REDIS_PASSWORD
+                }
+            ],
+        },
+    },
+}
+"""
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [
                 {
