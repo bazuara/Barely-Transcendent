@@ -6,9 +6,68 @@
         <button id="create-tournament-btn" class="btn btn-primary btn-lg w-100">Crear Torneo</button>
     </div>
     <div class="col-md-4 mb-3">
-        <button id="join-tournament-btn" class="btn btn-success btn-lg w-100">Unirse a Torneo</button>
+        <div class="input-group">
+            <input type="text" id="tournament-token-input" class="form-control" placeholder="Ingresa el token" maxlength="8">
+            <button id="join-tournament-btn" class="btn btn-success">Unirse</button>
+        </div>
     </div>
 </div>
-<div id="tournament-container" {% if user.is_authenticated %}data-user-id="{{ user.internal_id }}"{% endif %} class="mt-4"></div>
+<div id="tournament-container" class="mt-4"></div>
 
-<script src="{% static 'js/tournament.js' %}"></script>
+<script>
+    function loadTournamentScript(callback) {
+        if (typeof initTournament === 'function') {
+            console.log("[DEBUG] initTournament ya está disponible, no necesitamos cargar el script");
+            callback();
+            return;
+        }
+
+        if (window.tournamentScriptLoading) {
+            console.log("[DEBUG] tournament.js ya se está cargando en otra instancia");
+            const checkScript = setInterval(() => {
+                if (typeof initTournament === 'function') {
+                    clearInterval(checkScript);
+                    console.log("[DEBUG] tournament.js cargado por otra instancia, continuando...");
+                    callback();
+                }
+            }, 100);
+            return;
+        }
+
+        window.tournamentScriptLoading = true;
+        console.log("[DEBUG] Cargando tournament.js dinámicamente");
+
+        fetch("{% static 'js/tournament.js' %}")
+            .then(response => response.text())
+            .then(scriptText => {
+                (new Function(scriptText))();
+                console.log("[DEBUG] tournament.js cargado y evaluado");
+                window.tournamentScriptLoading = false;
+                setTimeout(callback, 50);
+            })
+            .catch(error => {
+                console.error("[ERROR] Error cargando tournament.js:", error);
+                window.tournamentScriptLoading = false;
+            });
+    }
+
+    function setupTournament() {
+        console.log("[DEBUG] Configurando torneo...");
+        loadTournamentScript(() => {
+            if (typeof initTournament === 'function') {
+                initTournament(true); // Forzar reinicialización
+            } else {
+                console.error("[ERROR] initTournament no está definido después de cargar el script");
+            }
+        });
+    }
+
+    setupTournament();
+
+    document.addEventListener('htmx:afterSwap', (event) => {
+        if (event.target.id === 'tournament-container' || event.target.closest('#tournament-container')) {
+            console.log("[DEBUG] Partial de torneo cargado vía HTMX, configurando...");
+            setupTournament();
+        }
+    });
+</script>

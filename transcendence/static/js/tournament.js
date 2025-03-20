@@ -1,74 +1,46 @@
-// static/js/tournament.js
 (() => {
     let socket = null;
     let tournamentToken = null;
     let participants = [];
-    let myUserId = null;
-    let isInitialized = false;
+    let creatorId = null; // Almacenar el ID del creador
 
-    function initTournament() {
-        if (isInitialized) {
+    function initTournament(forceReinit = false) {
+        if (!forceReinit && window.tournamentInitialized) {
             console.log("[DEBUG] Torneo ya inicializado, saltando inicialización...");
             return;
         }
 
         console.log("[DEBUG] Inicializando torneo...");
-
-        // Limpiar estado previo
         cleanupTournament();
-
-        // Obtener el ID del usuario actual
-        myUserId = getUserId();
-        if (!myUserId) {
-            console.error("[ERROR] No se pudo obtener el ID del usuario, esperando...");
-            // Intentar obtenerlo de nuevo después de un pequeño retraso
-            setTimeout(() => {
-                myUserId = getUserId();
-                if (myUserId) {
-                    proceedWithInitialization();
-                } else {
-                    showError("No estás autenticado. Por favor, inicia sesión.");
-                }
-            }, 500); // Esperar 500ms por si el dato se carga tarde
-            return;
-        }
-
-        proceedWithInitialization();
-    }
-
-    function proceedWithInitialization() {
-        console.log("[DEBUG] Procediendo con inicialización, userId:", myUserId);
-        isInitialized = true;
-
-        // Configurar WebSocket
         connectWebSocket();
-
-        // Configurar botones
         setupTournamentButtons();
-    }
+        window.tournamentInitialized = true;
 
-    function getUserId() {
-        // Intentar obtener de la variable global
-        if (typeof currentUserId !== 'undefined' && currentUserId !== '') {
-            return currentUserId;
-        }
-        // Fallback: buscar en el DOM si está inyectado en algún elemento
-        const userIdElement = document.querySelector('[data-user-id]');
-        if (userIdElement) {
-            return userIdElement.dataset.userId;
-        }
-        return null;
+        // Limpiar al navegar fuera de la página
+        document.addEventListener('htmx:beforeRequest', handleNavigation);
     }
 
     function cleanupTournament() {
         if (socket && socket.readyState !== WebSocket.CLOSED) {
             socket.close();
             socket = null;
+            console.log("[DEBUG] WebSocket cerrado al salir del torneo");
         }
         tournamentToken = null;
         participants = [];
-        isInitialized = false;
+        creatorId = null;
         updateTournamentUI();
+        window.tournamentInitialized = false;
+    }
+
+    function handleNavigation(event) {
+        // Si la solicitud HTMX no apunta a algo dentro de #tournament-container, asumimos que salimos
+        const target = event.detail.target;
+        if (!target.closest('#tournament-container') && window.tournamentInitialized) {
+            console.log("[DEBUG] Navegando fuera del torneo, limpiando...");
+            cleanupTournament();
+            document.removeEventListener('htmx:beforeRequest', handleNavigation);
+        }
     }
 
     function connectWebSocket() {
@@ -98,6 +70,8 @@
             case 'tournament_info':
                 tournamentToken = data.token;
                 participants = data.participants;
+                creatorId = data.creator; // Guardar el ID del creador
+                console.log("[DEBUG] Actualización recibida - Token:", tournamentToken, "Creador:", creatorId);
                 updateTournamentUI();
                 break;
             case 'error':
@@ -109,9 +83,30 @@
     function createTournament() {
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
-                action: 'create_tournament',
-                user_id: myUserId
+                action: 'create_tournament'
             }));
+        } else {
+            console.warn("[WARN] WebSocket no está abierto, intentando reconectar...");
+            connectWebSocket();
+            setTimeout(createTournament, 100);
+        }
+    }
+
+    function joinTournament(token) {
+        if (!token || token.length !== 8) {
+            showError("Por favor, ingresa un token válido de 8 caracteres.");
+            return;
+        }
+
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                action: 'join_tournament',
+                token: token
+            }));
+        } else {
+            console.warn("[WARN] WebSocket no está abierto, intentando reconectar...");
+            connectWebSocket();
+            setTimeout(() => joinTournament(token), 100);
         }
     }
 
@@ -122,26 +117,70 @@
         let html = '';
         if (tournamentToken) {
             html += `<p class="text-center">Token de invitación: <strong>${tournamentToken}</strong></p>`;
-            html += '<div class="row">';
-            html += '<div class="col-md-6"><h4>Equipo Izquierdo</h4><ul class="list-group">';
-            const leftTeam = participants.slice(0, 2);
-            leftTeam.forEach(p => {
-                html += `<li class="list-group-item">${p.intra_login} ${p.id === myUserId ? '(Tú)' : ''}</li>`;
-            });
-            for (let i = leftTeam.length; i < 2; i++) {
-                html += '<li class="list-group-item text-muted">Esperando jugador...</li>';
+            html += '<p class="text-center text-muted">Ambos matches se juegan simultáneamente. Los ganadores avanzarán a la final.</p>';
+            html += '<div class="row justify-content-center">';
+
+            // Match 1
+            html += '<div class="col-md-6 mb-3"><h4>Match 1</h4><ul class="list-group">';
+            const match1 = participants.slice(0, 2);
+            if (match1.length === 0) {
+                html += '<li class="list-group-item text-muted">Esperando jugador 1...</li>';
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += '<li class="list-group-item text-muted">Esperando jugador 2...</li>';
+            } else if (match1.length === 1) {
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match1[0].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match1[0].intra_login} ${match1[0].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match1[0].games_won || 0}, Puntos: ${match1[0].total_points || 0})
+                </li>`;
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += '<li class="list-group-item text-muted">Esperando jugador 2...</li>';
+            } else {
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match1[0].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match1[0].intra_login} ${match1[0].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match1[0].games_won || 0}, Puntos: ${match1[0].total_points || 0})
+                </li>`;
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match1[1].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match1[1].intra_login} ${match1[1].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match1[1].games_won || 0}, Puntos: ${match1[1].total_points || 0})
+                </li>`;
             }
             html += '</ul></div>';
 
-            html += '<div class="col-md-6"><h4>Equipo Derecho</h4><ul class="list-group">';
-            const rightTeam = participants.slice(2, 4);
-            rightTeam.forEach(p => {
-                html += `<li class="list-group-item">${p.intra_login} ${p.id === myUserId ? '(Tú)' : ''}</li>`;
-            });
-            for (let i = rightTeam.length; i < 2; i++) {
-                html += '<li class="list-group-item text-muted">Esperando jugador...</li>';
+            // Match 2
+            html += '<div class="col-md-6 mb-3"><h4>Match 2</h4><ul class="list-group">';
+            const match2 = participants.slice(2, 4);
+            if (match2.length === 0) {
+                html += '<li class="list-group-item text-muted">Esperando jugador 3...</li>';
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += '<li class="list-group-item text-muted">Esperando jugador 4...</li>';
+            } else if (match2.length === 1) {
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match2[0].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match2[0].intra_login} ${match2[0].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match2[0].games_won || 0}, Puntos: ${match2[0].total_points || 0})
+                </li>`;
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += '<li class="list-group-item text-muted">Esperando jugador 4...</li>';
+            } else {
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match2[0].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match2[0].intra_login} ${match2[0].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match2[0].games_won || 0}, Puntos: ${match2[0].total_points || 0})
+                </li>`;
+                html += '<li class="list-group-item text-center">VS</li>';
+                html += `<li class="list-group-item d-flex align-items-center">
+                    <img src="${match2[1].intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                    ${match2[1].intra_login} ${match2[1].id === creatorId ? '<span class="badge bg-primary ms-2">Creador</span>' : ''}
+                    (Ganados: ${match2[1].games_won || 0}, Puntos: ${match2[1].total_points || 0})
+                </li>`;
             }
-            html += '</ul></div></div>';
+            html += '</ul></div>';
+
+            html += '</div>';
         }
         tournamentContainer.innerHTML = html;
     }
@@ -156,22 +195,30 @@
     function setupTournamentButtons() {
         const createBtn = document.getElementById('create-tournament-btn');
         if (createBtn) {
-            createBtn.addEventListener('click', () => {
+            const newCreateBtn = createBtn.cloneNode(true);
+            createBtn.parentNode.replaceChild(newCreateBtn, createBtn);
+            newCreateBtn.addEventListener('click', () => {
                 console.log("[DEBUG] Creando torneo...");
                 createTournament();
             });
         }
+
+        const joinBtn = document.getElementById('join-tournament-btn');
+        const tokenInput = document.getElementById('tournament-token-input');
+        if (joinBtn && tokenInput) {
+            const newJoinBtn = joinBtn.cloneNode(true);
+            joinBtn.parentNode.replaceChild(newJoinBtn, joinBtn);
+            newJoinBtn.addEventListener('click', () => {
+                const token = tokenInput.value.trim();
+                console.log("[DEBUG] Intentando unirse al torneo con token:", token);
+                joinTournament(token);
+            });
+        }
     }
 
-    // Escuchar evento DOMContentLoaded para carga inicial
-    document.addEventListener('DOMContentLoaded', initTournament);
-
-    // Escuchar evento HTMX para carga dinámica del partial
-    document.addEventListener('htmx:afterSwap', (event) => {
-        if (event.target.id === 'tournament-container' || event.target.closest('#tournament-container')) {
-            console.log("[DEBUG] Partial de torneo cargado vía HTMX, inicializando...");
-            initTournament();
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("[DEBUG] DOM completamente cargado, intentando inicializar torneo...");
+        initTournament();
     });
 
     window.initTournament = initTournament;
