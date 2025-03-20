@@ -37,3 +37,11 @@ def pong(request):
     template = "partials/pong.html" if request.htmx else "pong.html"
     return render(request, template)
 
+def tournament(request):
+    # Verificar si el usuario está autenticado
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return redirect('login')
+    
+    template = "partials/tournament.html" if request.htmx else "tournament.html"
+    return render(request, template)

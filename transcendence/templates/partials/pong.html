@@ -18,6 +18,16 @@
                 <button id="play-online-btn" class="btn btn-success btn-lg" >Jugar Online</button>
             </div>
         </div>
+        <div class="col-md-4 mb-3">
+            <div class="d-grid">
+                <a href="{% url 'tournament' %}"
+                    class="btn btn-secondary btn-lg"
+                    hx-get="{% url 'tournament' %}"
+                    hx-target="#content"
+                    hx-push-url="true">Jugar Torneo
+                </a>
+            </div>
+        </div>
     </div>
     
     <div class="row justify-content-center mb-4">
@@ -200,6 +210,8 @@
                 }, 100);
             });
         }
+
+
     }
     
     // Cargar scripts si es necesario y luego configurar botones

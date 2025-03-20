@@ -1,0 +1,14 @@
+{% load static %}
+<h1 class="display-4 text-center">Torneos de Pong</h1>
+<p class="lead text-center">¡Organiza o únete a un torneo épico!</p>
+<div class="row justify-content-center">
+    <div class="col-md-4 mb-3">
+        <button id="create-tournament-btn" class="btn btn-primary btn-lg w-100">Crear Torneo</button>
+    </div>
+    <div class="col-md-4 mb-3">
+        <button id="join-tournament-btn" class="btn btn-success btn-lg w-100">Unirse a Torneo</button>
+    </div>
+</div>
+<div id="tournament-container" {% if user.is_authenticated %}data-user-id="{{ user.internal_id }}"{% endif %} class="mt-4"></div>
+
+<script src="{% static 'js/tournament.js' %}"></script>

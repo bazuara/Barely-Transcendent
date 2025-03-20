@@ -1,15 +1,20 @@
 import json
 import asyncio
 import random
+import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from users.models import User
 from pong.models import Game
 
-# Estas estructuras globales mantienen las conexiones de los jugadores
+# Estas estructuras globales mantienen las conexiones de los jugadores para Pong
 player_connections = {}  # Mapea IDs de usuario a sus conexiones (consumer)
 waiting_players = []     # Lista de IDs de usuario en espera
 active_games = {}        # Mapea room_ids a datos del juego
+
+# Estructuras globales para torneos
+tournament_rooms = {}    # Mapea token de torneo a datos del torneo
+tournament_connections = {}  # Mapea IDs de usuario a sus conexiones
 
 class PongConsumer(AsyncWebsocketConsumer):
     
@@ -428,7 +433,7 @@ class PongConsumer(AsyncWebsocketConsumer):
             'room_id': event['room_id'],  # Usar el room_id del evento
             'player1': event['player1'],
             'player2': event['player2'],
-            'session_id': self.session_id  # Incluir ID de sesión para identificación del cliente
+            'user_id': str(self.user.internal_id)  # Añadir mi user_id
         }))
 
     async def update_paddle(self, event):
@@ -535,3 +540,135 @@ class PongConsumer(AsyncWebsocketConsumer):
         if has_won:
             user.games_won += 1
         user.save()
+
+class TournamentConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        """Maneja la conexión inicial del cliente."""
+        session = self.scope.get('session', {})
+        user_id = session.get('user_id')
+        
+        if not user_id:
+            await self.close(code=4001, reason="No user_id in session")
+            return
+        
+        try:
+            self.user = await database_sync_to_async(User.objects.get)(internal_id=user_id)
+        except User.DoesNotExist:
+            await self.close(code=4002, reason="User not found")
+            return
+        
+        await self.accept()
+        tournament_connections[self.user.internal_id] = self
+        self.tournament_token = None  # Token del torneo al que está conectado
+
+    async def disconnect(self, close_code):
+        """Maneja la desconexión del cliente."""
+        if self.user.internal_id in tournament_connections:
+            del tournament_connections[self.user.internal_id]
+        
+        if self.tournament_token and self.tournament_token in tournament_rooms:
+            tournament_data = tournament_rooms[self.tournament_token]
+            if self.user.internal_id in tournament_data['participants']:
+                tournament_data['participants'].remove(self.user.internal_id)
+                await self.notify_participants(tournament_data)
+                
+                if not tournament_data['participants'] and self.tournament_token in tournament_rooms:
+                    del tournament_rooms[self.tournament_token]
+
+    async def receive(self, text_data):
+        """Maneja los mensajes recibidos del cliente."""
+        data = json.loads(text_data)
+        action = data.get('action')
+
+        if action == 'create_tournament':
+            # Generar un token único para el torneo
+            self.tournament_token = str(uuid.uuid4())[:8]  # Token corto y legible
+            tournament_rooms[self.tournament_token] = {
+                'creator': self.user.internal_id,
+                'participants': [self.user.internal_id],
+                'max_players': 4,
+                'status': 'waiting',
+                'channel_group': self.tournament_token
+            }
+            await self.channel_layer.group_add(self.tournament_token, self.channel_name)
+            await self.send_tournament_info()
+
+        elif action == 'join_tournament':
+            tournament_token = data.get('token')
+            if tournament_token in tournament_rooms:
+                tournament_data = tournament_rooms[tournament_token]
+                if len(tournament_data['participants']) < tournament_data['max_players']:
+                    if self.user.internal_id not in tournament_data['participants']:
+                        tournament_data['participants'].append(self.user.internal_id)
+                        self.tournament_token = tournament_token
+                        await self.channel_layer.group_add(tournament_token, self.channel_name)
+                        await self.notify_participants(tournament_data)
+                        await self.send_tournament_info()
+                    else:
+                        await self.send(text_data=json.dumps({
+                            'type': 'error',
+                            'message': 'Ya estás en este torneo'
+                        }))
+                else:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': 'El torneo está lleno'
+                    }))
+            else:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Token de torneo inválido'
+                }))
+
+    async def send_tournament_info(self):
+        """Envía la información del torneo al cliente."""
+        if self.tournament_token and self.tournament_token in tournament_rooms:
+            tournament_data = tournament_rooms[self.tournament_token]
+            participants_info = await self.get_participants_info(tournament_data['participants'])
+            await self.send(text_data=json.dumps({
+                'type': 'tournament_info',
+                'token': self.tournament_token,
+                'participants': participants_info,
+                'max_players': tournament_data['max_players'],
+                'status': tournament_data['status']
+            }))
+
+    async def notify_participants(self, tournament_data):
+        """Notifica a todos los participantes sobre los cambios en el torneo."""
+        participants_info = await self.get_participants_info(tournament_data['participants'])
+        await self.channel_layer.group_send(
+            tournament_data['channel_group'],
+            {
+                'type': 'tournament_update',
+                'token': self.tournament_token,
+                'participants': participants_info,
+                'max_players': tournament_data['max_players'],
+                'status': tournament_data['status']
+            }
+        )
+
+    @database_sync_to_async
+    def get_participants_info(self, participant_ids):
+        """Obtiene información de los participantes."""
+        participants = []
+        for user_id in participant_ids:
+            try:
+                user = User.objects.get(internal_id=user_id)
+                participants.append({
+                    'id': user.internal_id,
+                    'intra_login': user.internal_login or user.intra_login,
+                    'intra_picture': user.intra_picture
+                })
+            except User.DoesNotExist:
+                participants.append({'id': user_id, 'intra_login': f'User {user_id}', 'intra_picture': None})
+        return participants
+
+    async def tournament_update(self, event):
+        """Maneja las actualizaciones del torneo enviadas al grupo."""
+        await self.send(text_data=json.dumps({
+            'type': 'tournament_info',
+            'token': event['token'],
+            'participants': event['participants'],
+            'max_players': event['max_players'],
+            'status': event['status']
+        }))
