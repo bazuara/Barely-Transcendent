@@ -113,7 +113,8 @@ class PongConsumer(AsyncWebsocketConsumer):
             if user_id == self.user.internal_id:
                 points_scored = data.get('points_scored', 0)
                 has_won = data.get('has_won', False)
-                await database_sync_to_async(self.update_user_stats)(self.user, points_scored, has_won)
+                # Llamar directamente a update_user_stats como función asíncrona
+                await self.update_user_stats(self.user, points_scored, has_won)
                 print(f"[DEBUG] Estadísticas actualizadas para {user_id}")
 
     async def check_matchmaking(self):
