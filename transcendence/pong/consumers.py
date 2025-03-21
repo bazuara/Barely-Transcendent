@@ -352,7 +352,6 @@ class PongConsumer(AsyncWebsocketConsumer):
 
 class TournamentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        """Maneja la conexión inicial al WebSocket de torneos."""
         session = self.scope.get('session', {})
         user_id = session.get('user_id')
 
@@ -374,7 +373,6 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         self.tournament_token = None
 
     async def disconnect(self, close_code):
-        """Maneja la desconexión del WebSocket de torneos."""
         if self.user.internal_id in tournament_connections:
             del tournament_connections[self.user.internal_id]
 
@@ -384,36 +382,21 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 tournament_data['participants'].remove(self.user.internal_id)
                 print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}")
                 
-                # Si el usuario que sale es el creador, transferir el rol
                 if tournament_data['creator'] == self.user.internal_id and tournament_data['participants']:
                     tournament_data['creator'] = tournament_data['participants'][0]
                     print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
                 
-                # Enviar actualización a los participantes restantes
-                await self.channel_layer.group_send(
-                    self.tournament_token,
-                    {
-                        'type': 'tournament_info',
-                        'token': self.tournament_token,
-                        'participants': await self.get_participants_info(tournament_data['participants']),
-                        'max_players': tournament_data['max_players'],
-                        'status': tournament_data['status'],
-                        'creator': tournament_data['creator']
-                    }
-                )
+                await self.send_tournament_info()
                 
-                # Si el torneo queda vacío, eliminarlo
                 if not tournament_data['participants']:
                     del tournament_rooms[self.tournament_token]
                     print(f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
             await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
 
     async def receive(self, text_data):
-        """Maneja mensajes recibidos del cliente para torneos."""
         data = json.loads(text_data)
         action = data.get('action')
 
-        # Método auxiliar para sacar al usuario de cualquier torneo existente
         async def leave_existing_tournament():
             if self.tournament_token and self.tournament_token in tournament_rooms:
                 old_tournament = tournament_rooms[self.tournament_token]
@@ -421,32 +404,18 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     old_tournament['participants'].remove(self.user.internal_id)
                     print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}")
                     
-                    # Si el usuario que sale es el creador, transferir el rol
                     if old_tournament['creator'] == self.user.internal_id and old_tournament['participants']:
                         old_tournament['creator'] = old_tournament['participants'][0]
                         print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {old_tournament['creator']}")
                     
-                    # Enviar actualización a los participantes restantes
-                    await self.channel_layer.group_send(
-                        self.tournament_token,
-                        {
-                            'type': 'tournament_info',
-                            'token': self.tournament_token,
-                            'participants': await self.get_participants_info(old_tournament['participants']),
-                            'max_players': old_tournament['max_players'],
-                            'status': old_tournament['status'],
-                            'creator': old_tournament['creator']
-                        }
-                    )
+                    await self.send_tournament_info()
                     
-                    # Si no quedan participantes, eliminar el torneo
                     if not old_tournament['participants']:
                         del tournament_rooms[self.tournament_token]
                         print(f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
                 self.tournament_token = None
 
         if action == 'create_tournament':
-            # Sacar al usuario de cualquier torneo anterior antes de crear uno nuevo
             await leave_existing_tournament()
             self.tournament_token = str(uuid.uuid4())[:8]
             tournament_rooms[self.tournament_token] = {
@@ -498,7 +467,6 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 }))
                 return
 
-            # Sacar al usuario de cualquier torneo anterior
             await leave_existing_tournament()
 
             tournament_data['participants'].append(self.user.internal_id)
@@ -506,11 +474,45 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_add(tournament_token, self.channel_name)
             await self.send_tournament_info()
 
+        elif action == 'start_tournament':
+            tournament_token = data.get('token')
+            if not tournament_token or tournament_token != self.tournament_token:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Token de torneo inválido o no coincide'
+                }))
+                return
+
+            if tournament_token not in tournament_rooms:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'El torneo no existe'
+                }))
+                return
+
+            tournament_data = tournament_rooms[tournament_token]
+            if self.user.internal_id != tournament_data['creator']:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Solo el creador puede iniciar el torneo'
+                }))
+                return
+
+            if len(tournament_data['participants']) != 4:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Se necesitan exactamente 4 jugadores para iniciar el torneo'
+                }))
+                return
+
+            print(f"[DEBUG] Solicitud para iniciar el torneo {tournament_token} recibida por {self.user.internal_id}")
+            # Aquí irá la lógica para iniciar los matches
+
     async def send_tournament_info(self):
-        """Envía la información del torneo al grupo."""
         if self.tournament_token and self.tournament_token in tournament_rooms:
             tournament_data = tournament_rooms[self.tournament_token]
             participants_info = await self.get_participants_info(tournament_data['participants'])
+            print(f"[DEBUG] Enviando actualización al grupo - Token: {self.tournament_token}, Creator ID: {tournament_data['creator']}")
             await self.channel_layer.group_send(
                 self.tournament_token,
                 {
@@ -519,13 +521,12 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     'participants': participants_info,
                     'max_players': tournament_data['max_players'],
                     'status': tournament_data['status'],
-                    'creator': tournament_data['creator']
+                    'creator': tournament_data['creator'],
                 }
             )
 
     @database_sync_to_async
     def get_participants_info(self, participant_ids):
-        """Obtiene información detallada de los participantes."""
         participants = []
         for user_id in participant_ids:
             try:
@@ -548,12 +549,15 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         return participants
 
     async def tournament_info(self, event):
-        """Maneja las actualizaciones del torneo enviadas al cliente."""
+        # Calcular show_start_button localmente para cada usuario
+        show_start_button = (self.user.internal_id == event['creator'])
+        print(f"[DEBUG] Enviando a frontend - User ID: {self.user.internal_id}, Creator ID: {event['creator']}, Show Start Button: {show_start_button}")
         await self.send(text_data=json.dumps({
             'type': 'tournament_info',
             'token': event['token'],
             'participants': event['participants'],
             'max_players': event['max_players'],
             'status': event['status'],
-            'creator': event['creator']
+            'creator': event['creator'],
+            'show_start_button': show_start_button
         }))
