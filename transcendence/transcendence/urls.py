@@ -31,7 +31,7 @@ urlpatterns = [
     path('profile/update/', update_profile, name='update_profile'),  # Añadir ruta para actualizar perfil
     path('pong/', views.pong, name='pong'),
     path('tournament/', views.tournament, name='tournament'),
-    path('mock-login/', mock_login, name='mock_login'),
+    path('mock-login/<str:username>/', mock_login, name='mock_login'),
     path('profile/anonimize/', anonimize, name='anonimize'),
     path("prometheus/", include("django_prometheus.urls")),
 ]
