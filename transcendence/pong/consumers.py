@@ -726,174 +726,291 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
-        try:
-            self.user_id = int(self.user_id)  # Convertimos a int para validación
-        except ValueError:
-            print(f"[DEBUG] user_id no es un entero: {self.user_id}")
-            await self.close(code=4002)
-            return
-
+        # Verificar autorización
         tournament_data = tournament_rooms.get(self.tournament_token, {})
         match_key = self.match_id.split('-')[-1]
         expected_players = tournament_data.get('matches', {}).get(match_key, {}).get('players', [])
-        
-        if self.user_id not in expected_players:
-            print(f"[DEBUG] {self.user_id} no autorizado para {self.match_id}. Expected: {expected_players}")
+        user_id_str = str(self.user_id)
+        if user_id_str not in [str(p) for p in expected_players]:
+            print(f"[DEBUG] {user_id_str} no autorizado para {self.match_id}. Expected: {expected_players}")
             await self.close(code=4003)
             return
 
+        # Inicializar estado del juego si no existe
         if self.match_id not in match_states:
+            player1_id = str(expected_players[0])
+            player2_id = str(expected_players[1])
             match_states[self.match_id] = {
-                'players': {},  # user_id (str) -> player_number (int)
+                'ball_x': 0.5, 'ball_y': 0.5,
+                'ball_dx': 0.015 * random.choice([-1, 1]),
+                'ball_dy': 0.015 * 0.8 * random.choice([-1, 1]),
+                'player1_score': 0, 'player2_score': 0,
+                'left_paddle': 0.5, 'right_paddle': 0.5,
+                'player1_id': player1_id, 'player2_id': player2_id,
+                'players': {},
                 'ready': 0,
                 'running': False,
-                'game_over': False,
-                'paddle1': {'y': 0.5, 'score': 0},
-                'paddle2': {'y': 0.5, 'score': 0},
-                'ball': {'x': 0.5, 'y': 0.5, 'dx': 0.015, 'dy': 0.015}
             }
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
         print(f"[DEBUG] Jugador {self.user_id} conectado a {self.match_id}")
 
-        await self.receive(text_data=json.dumps({'action': 'join'}))
-
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         if self.match_id in match_states:
             state = match_states[self.match_id]
-            user_id_str = str(self.user_id)  # Convertimos a str
+            user_id_str = str(self.user_id)
             if user_id_str in state['players']:
                 del state['players'][user_id_str]
                 state['ready'] -= 1
                 state['running'] = False
-                state['game_over'] = True
-                print(f"[DEBUG] Jugador {self.user_id} desconectado de {self.match_id}. Ready: {state['ready']}")
-                await self.send_game_update(f"Jugador {self.user_id} se desconectó")
+                if 'ball_task' in state:
+                    state['ball_task'].cancel()
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'player_disconnected',
+                        'player_id': self.user_id
+                    }
+                )
+                if state['ready'] == 0:
+                    del match_states[self.match_id]
+                    print(f"[DEBUG] Estado de {self.match_id} eliminado por desconexión total")
 
     async def receive(self, text_data):
-        try:
-            data = json.loads(text_data)
-            action = data.get('action')
-            state = match_states.get(self.match_id)
-            if not state:
-                print(f"[DEBUG] No hay estado para {self.match_id}")
-                return
+        data = json.loads(text_data)
+        action = data.get('action')
+        state = match_states.get(self.match_id)
+        if not state:
+            print(f"[DEBUG] No hay estado para {self.match_id}")
+            return
 
-            user_id_str = str(self.user_id)  # Convertimos a str para el diccionario
-            print(f"[DEBUG] Recibido action: {action} de user_id: {self.user_id} para match: {self.match_id}")
-            print(f"[DEBUG] Estado actual - Players: {state['players']}, Ready: {state['ready']}")
+        user_id_str = str(self.user_id)
 
-            if action == 'join':
-                if user_id_str not in state['players']:
-                    player_number = 1 if len(state['players']) == 0 else 2
-                    state['players'][user_id_str] = player_number
-                    state['ready'] += 1
-                    print(f"[DEBUG] Jugador {self.user_id} se unió como jugador {player_number}, Ready: {state['ready']}")
-                else:
-                    print(f"[DEBUG] Jugador {self.user_id} ya está en el match")
+        if action == 'join':
+            if user_id_str not in state['players']:
+                player_number = 1 if user_id_str == state['player1_id'] else 2
+                state['players'][user_id_str] = player_number
+                state['ready'] += 1
+                print(f"[DEBUG] {self.user_id} se unió como player{player_number}, Ready: {state['ready']}")
 
                 if state['ready'] == 2 and not state['running']:
                     state['running'] = True
-                    print(f"[DEBUG] Iniciando game_loop para {self.match_id}")
-                    asyncio.create_task(self.game_loop())
-                await self.send_game_update('Jugador conectado')
+                    player1_info = await self.get_user_info(state['player1_id'])
+                    player2_info = await self.get_user_info(state['player2_id'])
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'game_start',
+                            'room_id': self.match_id,
+                            'player1': player1_info,
+                            'player2': player2_info
+                        }
+                    )
+                    state['ball_task'] = asyncio.create_task(self.move_ball())
+                    print(f"[DEBUG] Partida {self.match_id} iniciada")
 
-            elif action == 'move':
-                direction = data.get('direction')
-                if user_id_str in state['players']:
-                    paddle = 'paddle1' if state['players'][user_id_str] == 1 else 'paddle2'
-                    if direction == 'up':
-                        state[paddle]['y'] = max(0, state[paddle]['y'] - 0.025)
-                    elif direction == 'down':
-                        state[paddle]['y'] = min(1, state[paddle]['y'] + 0.025)
-                    await self.send_game_update('Movimiento de paleta')
+        elif action == 'move':
+            direction = data.get('direction')
+            paddle_step = 0.025  # Misma velocidad que el frontend
+            is_player1 = user_id_str == state['player1_id']
+            paddle_key = 'left_paddle' if is_player1 else 'right_paddle'
+            
+            if direction == 'up':
+                state[paddle_key] = max(0, state[paddle_key] - paddle_step)
+            elif direction == 'down':
+                state[paddle_key] = min(1, state[paddle_key] + paddle_step)
+            
+            print(f"[DEBUG] Moviendo {paddle_key} de {user_id_str} a {state[paddle_key]}")
+            
+            # Enviar actualización de ambas paletas a todos los clientes
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'update_paddle',
+                    'left_paddle': state['left_paddle'],
+                    'right_paddle': state['right_paddle']
+                }
+            )
 
-        except Exception as e:
-            print(f"[ERROR] Excepción en receive: {e}")
-            await self.send(text_data=json.dumps({
-                'type': 'error',
-                'message': 'Error interno en el servidor'
-            }))
+        elif action == 'game_over':
+            if user_id_str == data.get('player_id'):
+                points_scored = data.get('points_scored', 0)
+                has_won = data.get('has_won', False)
+                await self.update_user_stats(await self.get_user(self.user_id), points_scored, has_won)
+                print(f"[DEBUG] Estadísticas actualizadas para {self.user_id}")
 
-    async def game_loop(self):
+    async def move_ball(self):
         try:
             state = match_states[self.match_id]
             paddle_height = 0.2
-            while state['running'] and not state['game_over']:
-                ball = state['ball']
-                ball['x'] += ball['dx']
-                ball['y'] += ball['dy']
+            base_speed = 0.015
+            update_interval = 0.02
 
-                if ball['y'] <= 0 or ball['y'] >= 1:
-                    ball['dy'] = -ball['dy']
+            while state['running']:
+                state['ball_x'] += state['ball_dx']
+                state['ball_y'] += state['ball_dy']
 
-                if (ball['x'] <= 0.025 and 
-                    ball['y'] >= state['paddle1']['y'] - paddle_height/2 and 
-                    ball['y'] <= state['paddle1']['y'] + paddle_height/2):
-                    ball['dx'] = -ball['dx']
-                    ball['x'] = 0.025
+                if state['ball_y'] <= 0 or state['ball_y'] >= 1:
+                    state['ball_dy'] = -state['ball_dy'] * 1.02
+                    state['ball_y'] = max(0.01, min(0.99, state['ball_y']))
 
-                if (ball['x'] >= 0.975 and 
-                    ball['y'] >= state['paddle2']['y'] - paddle_height/2 and 
-                    ball['y'] <= state['paddle2']['y'] + paddle_height/2):
-                    ball['dx'] = -ball['dx']
-                    ball['x'] = 0.975
+                if (state['ball_x'] <= 0.025 and state['ball_x'] >= -0.01 and
+                    state['ball_y'] >= state['left_paddle'] - paddle_height/2 and
+                    state['ball_y'] <= state['left_paddle'] + paddle_height/2):
+                    state['ball_dx'] = -state['ball_dx'] * 1.1
+                    state['ball_x'] = 0.025
+                    relative_intersection = (state['ball_y'] - state['left_paddle']) / (paddle_height/2)
+                    state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
-                if ball['x'] <= 0:
-                    state['paddle2']['score'] += 1
-                    ball['x'], ball['y'] = 0.5, 0.5
-                    ball['dx'] = 0.015 * random.choice([-1, 1])
-                    ball['dy'] = 0.015 * random.choice([-1, 1])
+                if (state['ball_x'] >= 0.99 and state['ball_x'] <= 1.01 and
+                    state['ball_y'] >= state['right_paddle'] - paddle_height/2 and
+                    state['ball_y'] <= state['right_paddle'] + paddle_height/2):
+                    state['ball_dx'] = -state['ball_dx'] * 1.1
+                    state['ball_x'] = 0.99
+                    relative_intersection = (state['ball_y'] - state['right_paddle']) / (paddle_height/2)
+                    state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
-                elif ball['x'] >= 1:
-                    state['paddle1']['score'] += 1
-                    ball['x'], ball['y'] = 0.5, 0.5
-                    ball['dx'] = 0.015 * random.choice([-1, 1])
-                    ball['dy'] = 0.015 * random.choice([-1, 1])
+                if state['ball_x'] < 0:
+                    state['player2_score'] += 1
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {'type': 'update_score', 'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
+                    )
+                    self.reset_ball(state, base_speed)
+                    await asyncio.sleep(1)
 
-                if state['paddle1']['score'] >= 5 or state['paddle2']['score'] >= 5:
-                    state['game_over'] = True
-                    winner_id = next((int(user_id) for user_id, num in state['players'].items()
-                                    if (num == 1 and state['paddle1']['score'] >= 5) or
-                                       (num == 2 and state['paddle2']['score'] >= 5)), None)
-                    if winner_id:
-                        print(f"[DEBUG] Partida {self.match_id} terminada. Ganador: {winner_id}")
-                        await self.channel_layer.group_send(
-                            self.tournament_token,
-                            {
-                                'type': 'match_result',
-                                'match_id': self.match_id,
-                                'winner_id': winner_id,
-                            }
-                        )
-                    await self.send_game_update(f"Partida terminada")
-                    break
+                if state['ball_x'] > 1:
+                    state['player1_score'] += 1
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {'type': 'update_score', 'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
+                    )
+                    self.reset_ball(state, base_speed)
+                    await asyncio.sleep(1)
 
-                await self.send_game_update('Actualización de juego')
-                await asyncio.sleep(0.02)
+                if state['player1_score'] >= 5 or state['player2_score'] >= 5:
+                    winner = 1 if state['player1_score'] >= 5 else 2
+                    winner_id = state['player1_id'] if winner == 1 else state['player2_id']
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'game_over',
+                            'winner': winner,
+                            'player1_id': state['player1_id'],
+                            'player2_id': state['player2_id'],
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score']
+                        }
+                    )
+                    await self.channel_layer.group_send(
+                        self.tournament_token,
+                        {
+                            'type': 'match_result',
+                            'match_id': self.match_id,
+                            'winner_id': int(winner_id)
+                        }
+                    )
+                    await self.save_game_results(self.match_id, state)
+                    del match_states[self.match_id]
+                    return
 
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {'type': 'update_ball', 'ball_position_x': state['ball_x'], 'ball_position_y': state['ball_y']}
+                )
+                await asyncio.sleep(update_interval)
+
+        except asyncio.CancelledError:
+            print(f"[DEBUG] Tarea de pelota cancelada para {self.match_id}")
         except Exception as e:
-            print(f"[ERROR] Excepción en game_loop: {e}")
-            state['running'] = False
-            state['game_over'] = True
-            await self.send_game_update("Error en el juego")
+            print(f"[ERROR] Error en move_ball: {e}")
+            if self.match_id in match_states:
+                del match_states[self.match_id]
 
-    async def send_game_update(self, message):
-        state = match_states.get(self.match_id, {})
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'game_update',
-                'state': state,
-                'message': message
+    def reset_ball(self, state, base_speed):
+        state['ball_x'] = 0.5
+        state['ball_y'] = 0.5
+        state['ball_dx'] = base_speed * random.choice([-1, 1])
+        state['ball_dy'] = base_speed * 0.8 * random.choice([-1, 1])
+
+    @database_sync_to_async
+    def get_user(self, user_id):
+        return User.objects.get(internal_id=user_id)
+
+    @database_sync_to_async
+    def save_game_results(self, match_id, state):
+        game = Game.objects.filter(room_id=match_id).first()
+        if not game:
+            player1 = User.objects.get(internal_id=state['player1_id'])
+            player2 = User.objects.get(internal_id=state['player2_id'])
+            game = Game(player1=player1, player2=player2, room_id=match_id)
+        game.player1_score = state['player1_score']
+        game.player2_score = state['player2_score']
+        game.is_active = False
+        game.save()
+        print(f"[DEBUG] Resultados guardados para {match_id}")
+
+    @database_sync_to_async
+    def get_user_info(self, user_id):
+        try:
+            user = User.objects.get(internal_id=user_id)
+            return {
+                'id': user.internal_id,
+                'intra_id': user.intra_id,
+                'intra_login': user.internal_login or user.intra_login,
+                'intra_picture': user.intra_picture,
+                'user_id': user.internal_id  # Asegúrate de incluir user_id
             }
-        )
+        except User.DoesNotExist:
+            return {'id': user_id, 'intra_login': f'Usuario {user_id}', 'intra_picture': None, 'user_id': user_id}
 
-    async def game_update(self, event):
+    @database_sync_to_async
+    def update_user_stats(self, user, points_scored, has_won):
+        user.games_played += 1
+        user.total_points += points_scored
+        if has_won:
+            user.games_won += 1
+        user.save()
+
+    async def game_start(self, event):
         await self.send(text_data=json.dumps({
-            'type': 'game_update',
-            'state': event['state'],
-            'message': event.get('message', '')
+            'type': 'game_start',
+            'room_id': event['room_id'],
+            'player1': event['player1'],
+            'player2': event['player2'],
+            'user_id': str(self.user_id)
+        }))
+
+    async def update_paddle(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'update_paddle',
+            'left_paddle': event['left_paddle'],
+            'right_paddle': event['right_paddle']
+        }))
+
+    async def update_ball(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def update_score(self, event):
+        await self.send(text_data=json.dumps(event))
+
+    async def player_disconnected(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'error',
+            'message': 'El otro jugador se ha desconectado'
+        }))
+
+    async def game_over(self, event):
+        winner = event.get('winner', 0)
+        message = f'¡Jugador {winner} ha ganado!' if winner else 'Partida finalizada sin ganador'
+        await self.send(text_data=json.dumps({
+            'type': 'game_over',
+            'winner': winner,
+            'message': message,
+            'player1_id': event.get('player1_id'),
+            'player2_id': event.get('player2_id'),
+            'player1_score': event.get('player1_score', 0),
+            'player2_score': event.get('player2_score', 0)
         }))

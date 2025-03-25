@@ -13,6 +13,10 @@
     let myPlayerNumber = null;
     let myId = null;
     let opponentId = null;
+    let myName = null;
+    let myAvatar = null;
+    let opponentName = null;
+    let opponentAvatar = null;
 
     let socket = null;
     let matchId = null;
@@ -57,6 +61,10 @@
         myPlayerNumber = null;
         myId = null;
         opponentId = null;
+        myName = null;
+        myAvatar = null;
+        opponentName = null;
+        opponentAvatar = null;
         matchId = null;
         gameInitialized = false;
         keysPressed = {};
@@ -99,9 +107,8 @@
             return;
         }
         ctx = canvas.getContext('2d');
-        // Establecer dimensiones iniciales
         canvas.width = 800;
-        canvas.height = 600;
+        canvas.height = 400;
         window.addEventListener('resize', resizeCanvas);
 
         keysPressed = {};
@@ -139,8 +146,8 @@
         const player1Avatar = document.getElementById('player1-avatar');
         const player2Avatar = document.getElementById('player2-avatar');
         if (player1Name && player2Name && player1Avatar && player2Avatar) {
-            player1Name.textContent = `Jugador ${userIdParam}`;
-            player2Name.textContent = `Jugador ${opponentIdParam}`;
+            player1Name.textContent = "Cargando...";
+            player2Name.textContent = "Cargando...";
             player1Avatar.src = '/static/default-avatar.png';
             player2Avatar.src = '/static/default-avatar.png';
             player1Avatar.style.display = 'inline';
@@ -183,15 +190,20 @@
 
         socket.onclose = (event) => {
             console.log("[DEBUG] Conexión WebSocket de torneo cerrada:", event.code);
-            const gameMessage = document.getElementById('game-message');
-            if (gameMessage && !event.wasClean) {
-                gameMessage.innerHTML = `
-                    <h3 class="text-center">Se perdió la conexión</h3>
-                    <p class="text-center">Inténtalo de nuevo más tarde</p>
-                `;
-                gameMessage.classList.remove('d-none');
+            if (event.code === 1006 && gameInitialized) {
+                console.log("[DEBUG] Conexión perdida, reintentando...");
+                setTimeout(() => connectWebSocket(), 1000);
+            } else {
+                const gameMessage = document.getElementById('game-message');
+                if (gameMessage && !event.wasClean) {
+                    gameMessage.innerHTML = `
+                        <h3 class="text-center">Se perdió la conexión</h3>
+                        <p class="text-center">Inténtalo de nuevo más tarde</p>
+                    `;
+                    gameMessage.classList.remove('d-none');
+                }
+                gameInitialized = false;
             }
-            gameInitialized = false;
         };
 
         socket.onerror = (error) => {
@@ -200,65 +212,87 @@
     }
 
     function handleWebSocketMessage(data) {
-        if (data.type === 'game_update') {
-            const state = data.state;
-            const message = data.message;
-
-            if (!myPlayerNumber && myId && state.players[myId]) {
-                myPlayerNumber = state.players[myId];
-                console.log("[DEBUG] Asignado como jugador:", myPlayerNumber);
+        if (data.type === 'game_start') {
+            console.log("[DEBUG] Inicio de partida recibido, asignando jugadores y comenzando gameLoop");
+            const gameMessage = document.getElementById('game-message');
+            if (gameMessage) gameMessage.classList.add('d-none');
+            
+            myPlayerNumber = myId === data.player1.user_id ? 1 : 2;
+            console.log("[DEBUG] Asignado como jugador:", myPlayerNumber);
+    
+            myName = data.player1.user_id === myId ? data.player1.intra_login : data.player2.intra_login;
+            myAvatar = data.player1.user_id === myId ? data.player1.intra_picture : data.player2.intra_picture;
+            opponentName = data.player1.user_id === myId ? data.player2.intra_login : data.player1.intra_login;
+            opponentAvatar = data.player1.user_id === myId ? data.player2.intra_picture : data.player1.intra_picture;
+    
+            const player1Name = document.getElementById('player1-name');
+            const player2Name = document.getElementById('player2-name');
+            const player1Avatar = document.getElementById('player1-avatar');
+            const player2Avatar = document.getElementById('player2-avatar');
+            if (player1Name && player2Name && player1Avatar && player2Avatar) {
+                player1Name.textContent = myName;
+                player2Name.textContent = opponentName;
+                player1Avatar.src = myAvatar || '/static/default-avatar.png';
+                player2Avatar.src = opponentAvatar || '/static/default-avatar.png';
             }
-
-            // Iniciar el juego cuando ambos jugadores están listos
-            if (state.ready === 2 && !animationFrameId) {
-                console.log("[DEBUG] Ambos jugadores listos, iniciando juego");
-                const gameMessage = document.getElementById('game-message');
-                if (gameMessage) {
-                    gameMessage.classList.add('d-none');
-                }
+    
+            if (!animationFrameId) {
+                console.log("[DEBUG] Iniciando gameLoop");
                 animationFrameId = requestAnimationFrame(gameLoop);
             }
-
-            // Actualizar posiciones y puntajes según el número de jugador
+        }
+    
+        if (data.type === 'update_ball') {
             if (myPlayerNumber === 1) {
-                myPaddleY = state.paddle1.y; // Ya normalizado entre 0 y 1
-                targetOpponentPaddleY = state.paddle2.y;
-                myScore = state.paddle1.score;
-                opponentScore = state.paddle2.score;
-            } else if (myPlayerNumber === 2) {
-                myPaddleY = state.paddle2.y;
-                targetOpponentPaddleY = state.paddle1.y;
-                myScore = state.paddle2.score;
-                opponentScore = state.paddle1.score;
+                targetBallX = data.ball_position_x;
+                targetBallY = data.ball_position_y;
+            } else {
+                targetBallX = 1 - data.ball_position_x; // Invertir X para player2
+                targetBallY = data.ball_position_y;
             }
-            targetBallX = state.ball.x;
-            targetBallY = state.ball.y;
-
+        }
+    
+        if (data.type === 'update_paddle') {
+            if (myPlayerNumber === 1) {
+                targetOpponentPaddleY = data.right_paddle; // Oponente está a la derecha
+            } else {
+                targetOpponentPaddleY = data.left_paddle; // Oponente está a la izquierda
+            }
+            console.log("[DEBUG] Actualizando paleta oponente a:", targetOpponentPaddleY);
+        }
+    
+        if (data.type === 'update_score') {
+            if (myPlayerNumber === 1) {
+                myScore = data.player1_score;
+                opponentScore = data.player2_score;
+            } else {
+                myScore = data.player2_score;
+                opponentScore = data.player1_score;
+            }
             const score1Element = document.getElementById('player1-score');
             const score2Element = document.getElementById('player2-score');
             if (score1Element && score2Element) {
                 score1Element.textContent = myScore;
                 score2Element.textContent = opponentScore;
             }
-
-            // Mostrar resultado final cuando el juego termina
-            if (state.game_over) {
-                console.log("[DEBUG] Juego terminado, mostrando resultado");
-                const gameMessage = document.getElementById('game-message');
-                if (gameMessage) {
-                    const winnerMessage = myScore >= 5 ? '¡Has ganado!' : 'El oponente ha ganado';
-                    gameMessage.innerHTML = `
-                        <h3 class="text-center">¡Fin de la partida!</h3>
-                        <p class="text-center">${winnerMessage}</p>
-                        <p class="text-center">Puntuación: ${myScore} - ${opponentScore}</p>
-                    `;
-                    gameMessage.classList.remove('d-none');
-                }
-                gameInitialized = false;
-                if (animationFrameId) {
-                    cancelAnimationFrame(animationFrameId);
-                    animationFrameId = null;
-                }
+        }
+    
+        if (data.type === 'game_over') {
+            console.log("[DEBUG] Juego terminado, mostrando resultado");
+            const gameMessage = document.getElementById('game-message');
+            if (gameMessage) {
+                const winnerMessage = myId === data.winner ? '¡Has ganado!' : 'El oponente ha ganado';
+                gameMessage.innerHTML = `
+                    <h3 class="text-center">¡Fin de la partida!</h3>
+                    <p class="text-center">${winnerMessage}</p>
+                    <p class="text-center">Puntuación: ${myScore} - ${opponentScore}</p>
+                `;
+                gameMessage.classList.remove('d-none');
+            }
+            gameInitialized = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
             }
         }
     }
@@ -275,6 +309,7 @@
                     direction = 'down';
                 }
                 if (direction) {
+                    console.log("[DEBUG] Enviando movimiento de paleta:", direction);
                     socket.send(JSON.stringify({
                         'action': 'move',
                         'direction': direction
@@ -289,7 +324,6 @@
         const container = canvas.parentElement;
         if (!container) return;
         canvas.width = container.clientWidth;
-        // No establecer canvas.height, dejarlo al CSS (400px)
     }
 
     function lerp(start, end, factor) {
@@ -306,28 +340,27 @@
         ballX = lerp(ballX, targetBallX, BALL_INTERPOLATION_SPEED * deltaTime * 60);
         ballY = lerp(ballY, targetBallY, BALL_INTERPOLATION_SPEED * deltaTime * 60);
 
+        console.log("[DEBUG] gameLoop - ballX:", ballX, "ballY:", ballY, "myPaddleY:", myPaddleY, "opponentPaddleY:", opponentPaddleY);
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const paddleWidth = 15;
-        const paddleHeight = 100;
-        const ballRadius = 10;
 
-        // Dibujar mi paleta (izquierda)
+        // Siempre dibujar mi paleta a la izquierda (independientemente de myPlayerNumber)
         ctx.fillStyle = '#00FF00';
-        ctx.fillRect(0, myPaddleY * canvas.height - paddleHeight / 2, paddleWidth, paddleHeight);
+        ctx.fillRect(0, myPaddleY * canvas.height - PADDLE_HEIGHT / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
 
-        // Dibujar paleta del oponente (derecha)
+        // Siempre dibujar la paleta del oponente a la derecha
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(
-            canvas.width - paddleWidth,
-            opponentPaddleY * canvas.height - paddleHeight / 2,
-            paddleWidth,
-            paddleHeight
+            canvas.width - PADDLE_WIDTH,
+            opponentPaddleY * canvas.height - PADDLE_HEIGHT / 2,
+            PADDLE_WIDTH,
+            PADDLE_HEIGHT
         );
 
         // Dibujar pelota
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.arc(ballX * canvas.width, ballY * canvas.height, ballRadius, 0, Math.PI * 2);
+        ctx.arc(ballX * canvas.width, ballY * canvas.height, BALL_RADIUS, 0, Math.PI * 2);
         ctx.fill();
 
         animationFrameId = requestAnimationFrame(gameLoop);

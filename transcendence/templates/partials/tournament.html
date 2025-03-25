@@ -15,9 +15,7 @@
 <div id="tournament-container" class="mt-4"></div>
 
 <!-- Contenedor del juego -->
-<div id="game-container" class="d-none mt-4" style="position: relative; max-width: 800px; margin: 0 auto;">
-    <canvas id="pong-canvas" style="background: #000;"></canvas>
-    <div id="game-message" class="d-none position-absolute top-50 start-50 translate-middle text-white" style="z-index: 10;"></div>
+<div id="game-container" class="d-none mt-4" style="position: relative; margin: 1 auto;">
     <div class="d-flex justify-content-between text-white mt-2">
         <div>
             <img id="player1-avatar" src="" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover; display: none;">
@@ -30,17 +28,19 @@
             <img id="player2-avatar" src="" alt="Avatar" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover; display: none;">
         </div>
     </div>
+    <canvas id="pong-canvas" style="background: #000;"></canvas>
+    <div id="game-message" class="d-none position-absolute top-50 start-50 translate-middle text-white" style="z-index: 10;"></div>
 </div>
 
 <style>
     #game-container {
         width: 100%;
-        max-width: 800px;
+        max-width: 840px;
     }
 
     #pong-canvas {
-        width: 100%;
-        height: 400px;
+        width: 840px;
+        height: 630px;
         display: block;
     }
 </style>

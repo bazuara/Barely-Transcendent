@@ -263,39 +263,42 @@
             console.error("[ERROR] No se encontró #tournament-container en el DOM");
             return;
         }
-
+    
         let html = '<h3 class="text-center">Resultados del Torneo</h3>';
         html += '<div class="row justify-content-center">';
-
+    
+        // Match 1
         html += '<div class="col-md-4 mb-3"><h4>Match 1</h4><ul class="list-group">';
-        results.match1.players.forEach(playerId => {
+        results.match1.players.forEach(player => {
             html += `<li class="list-group-item d-flex align-items-center">
-                <img src="/static/default-avatar.png" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
-                Jugador ${playerId} ${playerId === results.match1.winner ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
+                <img src="${player.intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                ${player.intra_login} ${player.id === results.match1.winner.id ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
             </li>`;
         });
         html += '</ul></div>';
-
+    
+        // Match 2
         html += '<div class="col-md-4 mb-3"><h4>Match 2</h4><ul class="list-group">';
-        results.match2.players.forEach(playerId => {
+        results.match2.players.forEach(player => {
             html += `<li class="list-group-item d-flex align-items-center">
-                <img src="/static/default-avatar.png" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
-                Jugador ${playerId} ${playerId === results.match2.winner ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
+                <img src="${player.intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                ${player.intra_login} ${player.id === results.match2.winner.id ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
             </li>`;
         });
         html += '</ul></div>';
-
+    
+        // Final
         html += '<div class="col-md-4 mb-3"><h4>Final</h4><ul class="list-group">';
-        results.final.players.forEach(playerId => {
+        results.final.players.forEach(player => {
             html += `<li class="list-group-item d-flex align-items-center">
-                <img src="/static/default-avatar.png" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
-                Jugador ${playerId} ${playerId === results.final.winner ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
+                <img src="${player.intra_picture || '/static/default-avatar.png'}" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                ${player.intra_login} ${player.id === results.final.winner.id ? '<span class="badge bg-success ms-2">Ganador</span>' : ''}
             </li>`;
         });
         html += '</ul></div>';
-
+    
         html += '</div>';
-
+    
         tournamentContainer.innerHTML = html;
     }
 
