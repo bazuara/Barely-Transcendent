@@ -14,50 +14,101 @@
 </div>
 <div id="tournament-container" class="mt-4"></div>
 
-<script>
-    function loadTournamentScript(callback) {
-        if (typeof initTournament === 'function') {
-            console.log("[DEBUG] initTournament ya está disponible, no necesitamos cargar el script");
-            callback();
-            return;
-        }
+<!-- Contenedor del juego -->
+<div id="game-container" class="d-none mt-4" style="position: relative; max-width: 800px; margin: 0 auto;">
+    <canvas id="pong-canvas" style="background: #000;"></canvas>
+    <div id="game-message" class="d-none position-absolute top-50 start-50 translate-middle text-white" style="z-index: 10;"></div>
+    <div class="d-flex justify-content-between text-white mt-2">
+        <div>
+            <img id="player1-avatar" src="" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+            <span id="player1-name"></span>
+            <span>Puntuación: <span id="player1-score">0</span></span>
+        </div>
+        <div>
+            <span>Puntuación: <span id="player2-score">0</span></span>
+            <span id="player2-name" class="me-2"></span>
+            <img id="player2-avatar" src="" alt="Avatar" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+        </div>
+    </div>
+</div>
 
-        if (window.tournamentScriptLoading) {
-            console.log("[DEBUG] tournament.js ya se está cargando en otra instancia");
+<style>
+    #game-container {
+        width: 100%;
+        max-width: 800px;
+    }
+
+    #pong-canvas {
+        width: 100%;
+        height: 400px;
+        display: block;
+    }
+</style>
+
+<script>
+    function loadScript(url, callback) {
+        if (window[`${url}_loading`]) {
+            console.log(`[DEBUG] ${url} ya se está cargando en otra instancia`);
             const checkScript = setInterval(() => {
-                if (typeof initTournament === 'function') {
+                if (window[`${url}_loaded`]) {
                     clearInterval(checkScript);
-                    console.log("[DEBUG] tournament.js cargado por otra instancia, continuando...");
+                    console.log(`[DEBUG] ${url} cargado por otra instancia, continuando...`);
                     callback();
                 }
             }, 100);
             return;
         }
 
-        window.tournamentScriptLoading = true;
-        console.log("[DEBUG] Cargando tournament.js dinámicamente");
+        window[`${url}_loading`] = true;
+        console.log(`[DEBUG] Cargando ${url} dinámicamente`);
 
-        fetch("{% static 'js/tournament.js' %}")
+        fetch(url)
             .then(response => response.text())
             .then(scriptText => {
                 (new Function(scriptText))();
-                console.log("[DEBUG] tournament.js cargado y evaluado");
-                window.tournamentScriptLoading = false;
+                console.log(`[DEBUG] ${url} cargado y evaluado`);
+                window[`${url}_loaded`] = true;
+                window[`${url}_loading`] = false;
                 setTimeout(callback, 50);
             })
             .catch(error => {
-                console.error("[ERROR] Error cargando tournament.js:", error);
-                window.tournamentScriptLoading = false;
+                console.error(`[ERROR] Error cargando ${url}:`, error);
+                window[`${url}_loading`] = false;
             });
+    }
+
+    function loadTournamentScripts(callback) {
+        const tournamentScriptUrl = "{% static 'js/tournament.js' %}";
+        const tournamentGameScriptUrl = "{% static 'js/tournament-game.js' %}";
+
+        if (typeof initTournament === 'function') {
+            console.log("[DEBUG] initTournament ya está disponible, saltando carga de tournament.js");
+            loadTournamentGameScript();
+        } else {
+            loadScript(tournamentScriptUrl, loadTournamentGameScript);
+        }
+
+        function loadTournamentGameScript() {
+            if (typeof startTournamentMatch === 'function') {
+                console.log("[DEBUG] startTournamentMatch ya está disponible, saltando carga de tournament-game.js");
+                callback();
+            } else {
+                loadScript(tournamentGameScriptUrl, callback);
+            }
+        }
     }
 
     function setupTournament() {
         console.log("[DEBUG] Configurando torneo...");
-        loadTournamentScript(() => {
-            if (typeof initTournament === 'function') {
-                initTournament(true); // Forzar reinicialización
+        const timeout = setTimeout(() => {
+            console.error("[ERROR] Tiempo de espera agotado al cargar scripts del torneo");
+        }, 5000);
+        loadTournamentScripts(() => {
+            clearTimeout(timeout);
+            if (typeof initTournament === 'function' && typeof startTournamentMatch === 'function') {
+                initTournament(true);
             } else {
-                console.error("[ERROR] initTournament no está definido después de cargar el script");
+                console.error("[ERROR] initTournament o startTournamentMatch no están definidos después de cargar los scripts");
             }
         });
     }

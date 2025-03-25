@@ -6,6 +6,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from users.models import User
 from pong.models import Game
+from urllib import parse
 
 # Estructuras globales para Pong
 player_connections = {}  # Mapea IDs de usuario a sus conexiones (PongConsumer)
@@ -15,6 +16,7 @@ active_games = {}       # Mapea room_ids a datos del juego
 # Estructuras globales para torneos
 tournament_rooms = {}    # Mapea token de torneo a datos del torneo
 tournament_connections = {}  # Mapea IDs de usuario a sus conexiones (TournamentConsumer)
+match_states = {}  # Mapea room_ids a datos del juego
 
 class PongConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -113,7 +115,6 @@ class PongConsumer(AsyncWebsocketConsumer):
             if user_id == self.user.internal_id:
                 points_scored = data.get('points_scored', 0)
                 has_won = data.get('has_won', False)
-                # Llamar directamente a update_user_stats como función asíncrona
                 await self.update_user_stats(self.user, points_scored, has_won)
                 print(f"[DEBUG] Estadísticas actualizadas para {user_id}")
 
@@ -362,7 +363,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
         try:
             self.user = await database_sync_to_async(User.objects.get)(internal_id=user_id)
-            print(f"[DEBUG] Usuario autenticado en torneo: {self.user.internal_id}")
+            print(f"[DEBUG] Usuario autenticado en torneo - User ID: {self.user.internal_id}, Session: {session}")
         except User.DoesNotExist:
             print(f"[DEBUG] Usuario {user_id} no encontrado")
             await self.close(code=4002)
@@ -370,17 +371,19 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
         tournament_connections[self.user.internal_id] = self
+        print(f"[DEBUG] Conexión registrada - Tournament Connections: {list(tournament_connections.keys())}")
         self.tournament_token = None
 
     async def disconnect(self, close_code):
         if self.user.internal_id in tournament_connections:
             del tournament_connections[self.user.internal_id]
+            print(f"[DEBUG] Conexión eliminada - User ID: {self.user.internal_id}, Remaining Connections: {list(tournament_connections.keys())}")
 
         if self.tournament_token and self.tournament_token in tournament_rooms:
             tournament_data = tournament_rooms[self.tournament_token]
             if self.user.internal_id in tournament_data['participants']:
                 tournament_data['participants'].remove(self.user.internal_id)
-                print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}")
+                print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}, Participants: {tournament_data['participants']}")
                 
                 if tournament_data['creator'] == self.user.internal_id and tournament_data['participants']:
                     tournament_data['creator'] = tournament_data['participants'][0]
@@ -423,7 +426,12 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 'participants': [self.user.internal_id],
                 'max_players': 4,
                 'status': 'waiting',
-                'channel_group': self.tournament_token
+                'channel_group': self.tournament_token,
+                'matches': {
+                    'match1': {'players': [], 'winner': None},
+                    'match2': {'players': [], 'winner': None},
+                    'final': {'players': [], 'winner': None},
+                }
             }
             print(f"[DEBUG] Torneo creado por {self.user.internal_id}: {self.tournament_token}")
             await self.channel_layer.group_add(self.tournament_token, self.channel_name)
@@ -446,6 +454,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 return
 
             tournament_data = tournament_rooms[tournament_token]
+            print(f"[DEBUG] Intento de unión - User ID: {self.user.internal_id}, Tournament: {tournament_token}, Current Participants: {tournament_data['participants']}")
+            
             if tournament_data['status'] != 'waiting':
                 await self.send(text_data=json.dumps({
                     'type': 'error',
@@ -461,6 +471,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 return
 
             if self.user.internal_id in tournament_data['participants']:
+                print(f"[DEBUG] Error: Usuario {self.user.internal_id} ya está en participants: {tournament_data['participants']}")
                 await self.send(text_data=json.dumps({
                     'type': 'error',
                     'message': 'Ya estás en este torneo'
@@ -472,6 +483,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             tournament_data['participants'].append(self.user.internal_id)
             self.tournament_token = tournament_token
             await self.channel_layer.group_add(tournament_token, self.channel_name)
+            print(f"[DEBUG] {self.user.internal_id} se unió al torneo {tournament_token}, New Participants: {tournament_data['participants']}")
             await self.send_tournament_info()
 
         elif action == 'start_tournament':
@@ -505,8 +517,43 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 }))
                 return
 
-            print(f"[DEBUG] Solicitud para iniciar el torneo {tournament_token} recibida por {self.user.internal_id}")
-            # Aquí irá la lógica para iniciar los matches
+            print(f"[DEBUG] Iniciando torneo {tournament_token} por {self.user.internal_id}")
+            tournament_data['status'] = 'in_progress'
+
+            participants = tournament_data['participants']  # Lista de IDs: [1, 2, 3, 4]
+            match1_players = participants[:2]  # [1, 2]
+            match2_players = participants[2:]  # [3, 4]
+
+            tournament_data['matches']['match1']['players'] = match1_players
+            tournament_data['matches']['match2']['players'] = match2_players
+
+            match1_id = f"{tournament_token}-match1"
+            match2_id = f"{tournament_token}-match2"
+
+            # Enviar mensajes a los jugadores de match1
+            for player_id in match1_players:
+                opponent_id = match1_players[0] if player_id != match1_players[0] else match1_players[1]
+                if player_id in tournament_connections:
+                    await tournament_connections[player_id].send(text_data=json.dumps({
+                        'type': 'start_tournament',
+                        'match_id': match1_id,
+                        'opponent_id': opponent_id,
+                        'user_id': player_id
+                    }))
+
+            # Enviar mensajes a los jugadores de match2
+            for player_id in match2_players:
+                opponent_id = match2_players[0] if player_id != match2_players[0] else match2_players[1]
+                if player_id in tournament_connections:
+                    await tournament_connections[player_id].send(text_data=json.dumps({
+                        'type': 'start_tournament',
+                        'match_id': match2_id,
+                        'opponent_id': opponent_id,
+                        'user_id': player_id
+                    }))
+
+            print(f"[DEBUG] Matches iniciados: {match1_id} ({match1_players}), {match2_id} ({match2_players})")
+            await self.send_tournament_info()
 
     async def send_tournament_info(self):
         if self.tournament_token and self.tournament_token in tournament_rooms:
@@ -549,7 +596,6 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         return participants
 
     async def tournament_info(self, event):
-        # Calcular show_start_button localmente para cada usuario
         show_start_button = (self.user.internal_id == event['creator'])
         print(f"[DEBUG] Enviando a frontend - User ID: {self.user.internal_id}, Creator ID: {event['creator']}, Show Start Button: {show_start_button}")
         await self.send(text_data=json.dumps({
@@ -560,4 +606,294 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             'status': event['status'],
             'creator': event['creator'],
             'show_start_button': show_start_button
+        }))
+
+    async def match_result(self, event):
+        match_id = event['match_id']
+        winner_id = event['winner_id']
+        if self.tournament_token and self.tournament_token in tournament_rooms:
+            tournament_data = tournament_rooms[self.tournament_token]
+            match_key = match_id.split('-')[-1]
+            if match_key in tournament_data['matches']:
+                tournament_data['matches'][match_key]['winner'] = winner_id
+                print(f"[DEBUG] Ganador de {match_id}: {winner_id}")
+
+                if match_key == 'final':
+                    tournament_data['status'] = 'finished'
+                    results = {
+                        'participants': await self.get_participants_info(tournament_data['participants']),
+                        'match1': {
+                            'players': await self.get_participants_info(tournament_data['matches']['match1']['players']),
+                            'winner': await self.get_participant_info(tournament_data['matches']['match1']['winner'])
+                        },
+                        'match2': {
+                            'players': await self.get_participants_info(tournament_data['matches']['match2']['players']),
+                            'winner': await self.get_participant_info(tournament_data['matches']['match2']['winner'])
+                        },
+                        'final': {
+                            'players': await self.get_participants_info(tournament_data['matches']['final']['players']),
+                            'winner': await self.get_participant_info(tournament_data['matches']['final']['winner'])
+                        }
+                    }
+                    await self.channel_layer.group_send(
+                        self.tournament_token,
+                        {
+                            'type': 'tournament_results',
+                            'results': results
+                        }
+                    )
+                    print(f"[DEBUG] Torneo {self.tournament_token} finalizado. Resultados enviados.")
+                elif (tournament_data['matches']['match1']['winner'] is not None and 
+                      tournament_data['matches']['match2']['winner'] is not None and 
+                      tournament_data['status'] == 'in_progress'):
+                    await self.start_final(tournament_data)
+
+    async def start_final(self, tournament_data):
+        tournament_data['status'] = 'final'
+        finalists = [
+            tournament_data['matches']['match1']['winner'],
+            tournament_data['matches']['match2']['winner']
+        ]
+        tournament_data['matches']['final']['players'] = finalists
+        final_match_id = f"{self.tournament_token}-final"
+
+        for i in range(5, 0, -1):
+            await self.channel_layer.group_send(
+                self.tournament_token,
+                {
+                    'type': 'countdown_to_final',
+                    'seconds': i,
+                    'final_match_id': final_match_id
+                }
+            )
+            await asyncio.sleep(1)
+
+        for player_id in finalists:
+            if player_id in tournament_connections:
+                await tournament_connections[player_id].send(text_data=json.dumps({
+                    'type': 'start_tournament',
+                    'match_id': final_match_id,
+                    'opponent_id': finalists[0] if player_id == finalists[1] else finalists[1],
+                    'user_id': player_id
+                }))
+
+        print(f"[DEBUG] Final iniciada: {final_match_id} ({finalists})")
+        await self.send_tournament_info()
+
+    async def countdown_to_final(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'countdown_to_final',
+            'seconds': event['seconds'],
+            'final_match_id': event['final_match_id']
+        }))
+
+    async def tournament_results(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'tournament_results',
+            'results': event['results']
+        }))
+
+    @database_sync_to_async
+    def get_participant_info(self, user_id):
+        try:
+            user = User.objects.get(internal_id=user_id)
+            return {
+                'id': user.internal_id,
+                'intra_login': user.internal_login or user.intra_login,
+                'intra_picture': user.intra_picture,
+                'games_won': user.games_won,
+                'total_points': user.total_points
+            }
+        except User.DoesNotExist:
+            return {
+                'id': user_id,
+                'intra_login': f'User {user_id}',
+                'intra_picture': None,
+                'games_won': 0,
+                'total_points': 0
+            }
+
+class TournamentMatchConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.match_id = self.scope['url_route']['kwargs']['match_id']
+        self.tournament_token = self.match_id.split('-')[0]
+        self.room_group_name = f'match_{self.match_id}'
+        
+        session = self.scope.get('session', {})
+        self.user_id = session.get('user_id')
+        if not self.user_id:
+            print(f"[DEBUG] No user_id en sesión para {self.match_id}")
+            await self.close(code=4001)
+            return
+
+        try:
+            self.user_id = int(self.user_id)  # Convertimos a int para validación
+        except ValueError:
+            print(f"[DEBUG] user_id no es un entero: {self.user_id}")
+            await self.close(code=4002)
+            return
+
+        tournament_data = tournament_rooms.get(self.tournament_token, {})
+        match_key = self.match_id.split('-')[-1]
+        expected_players = tournament_data.get('matches', {}).get(match_key, {}).get('players', [])
+        
+        if self.user_id not in expected_players:
+            print(f"[DEBUG] {self.user_id} no autorizado para {self.match_id}. Expected: {expected_players}")
+            await self.close(code=4003)
+            return
+
+        if self.match_id not in match_states:
+            match_states[self.match_id] = {
+                'players': {},  # user_id (str) -> player_number (int)
+                'ready': 0,
+                'running': False,
+                'game_over': False,
+                'paddle1': {'y': 0.5, 'score': 0},
+                'paddle2': {'y': 0.5, 'score': 0},
+                'ball': {'x': 0.5, 'y': 0.5, 'dx': 0.015, 'dy': 0.015}
+            }
+
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+        print(f"[DEBUG] Jugador {self.user_id} conectado a {self.match_id}")
+
+        await self.receive(text_data=json.dumps({'action': 'join'}))
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if self.match_id in match_states:
+            state = match_states[self.match_id]
+            user_id_str = str(self.user_id)  # Convertimos a str
+            if user_id_str in state['players']:
+                del state['players'][user_id_str]
+                state['ready'] -= 1
+                state['running'] = False
+                state['game_over'] = True
+                print(f"[DEBUG] Jugador {self.user_id} desconectado de {self.match_id}. Ready: {state['ready']}")
+                await self.send_game_update(f"Jugador {self.user_id} se desconectó")
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            action = data.get('action')
+            state = match_states.get(self.match_id)
+            if not state:
+                print(f"[DEBUG] No hay estado para {self.match_id}")
+                return
+
+            user_id_str = str(self.user_id)  # Convertimos a str para el diccionario
+            print(f"[DEBUG] Recibido action: {action} de user_id: {self.user_id} para match: {self.match_id}")
+            print(f"[DEBUG] Estado actual - Players: {state['players']}, Ready: {state['ready']}")
+
+            if action == 'join':
+                if user_id_str not in state['players']:
+                    player_number = 1 if len(state['players']) == 0 else 2
+                    state['players'][user_id_str] = player_number
+                    state['ready'] += 1
+                    print(f"[DEBUG] Jugador {self.user_id} se unió como jugador {player_number}, Ready: {state['ready']}")
+                else:
+                    print(f"[DEBUG] Jugador {self.user_id} ya está en el match")
+
+                if state['ready'] == 2 and not state['running']:
+                    state['running'] = True
+                    print(f"[DEBUG] Iniciando game_loop para {self.match_id}")
+                    asyncio.create_task(self.game_loop())
+                await self.send_game_update('Jugador conectado')
+
+            elif action == 'move':
+                direction = data.get('direction')
+                if user_id_str in state['players']:
+                    paddle = 'paddle1' if state['players'][user_id_str] == 1 else 'paddle2'
+                    if direction == 'up':
+                        state[paddle]['y'] = max(0, state[paddle]['y'] - 0.025)
+                    elif direction == 'down':
+                        state[paddle]['y'] = min(1, state[paddle]['y'] + 0.025)
+                    await self.send_game_update('Movimiento de paleta')
+
+        except Exception as e:
+            print(f"[ERROR] Excepción en receive: {e}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': 'Error interno en el servidor'
+            }))
+
+    async def game_loop(self):
+        try:
+            state = match_states[self.match_id]
+            paddle_height = 0.2
+            while state['running'] and not state['game_over']:
+                ball = state['ball']
+                ball['x'] += ball['dx']
+                ball['y'] += ball['dy']
+
+                if ball['y'] <= 0 or ball['y'] >= 1:
+                    ball['dy'] = -ball['dy']
+
+                if (ball['x'] <= 0.025 and 
+                    ball['y'] >= state['paddle1']['y'] - paddle_height/2 and 
+                    ball['y'] <= state['paddle1']['y'] + paddle_height/2):
+                    ball['dx'] = -ball['dx']
+                    ball['x'] = 0.025
+
+                if (ball['x'] >= 0.975 and 
+                    ball['y'] >= state['paddle2']['y'] - paddle_height/2 and 
+                    ball['y'] <= state['paddle2']['y'] + paddle_height/2):
+                    ball['dx'] = -ball['dx']
+                    ball['x'] = 0.975
+
+                if ball['x'] <= 0:
+                    state['paddle2']['score'] += 1
+                    ball['x'], ball['y'] = 0.5, 0.5
+                    ball['dx'] = 0.015 * random.choice([-1, 1])
+                    ball['dy'] = 0.015 * random.choice([-1, 1])
+
+                elif ball['x'] >= 1:
+                    state['paddle1']['score'] += 1
+                    ball['x'], ball['y'] = 0.5, 0.5
+                    ball['dx'] = 0.015 * random.choice([-1, 1])
+                    ball['dy'] = 0.015 * random.choice([-1, 1])
+
+                if state['paddle1']['score'] >= 5 or state['paddle2']['score'] >= 5:
+                    state['game_over'] = True
+                    winner_id = next((int(user_id) for user_id, num in state['players'].items()
+                                    if (num == 1 and state['paddle1']['score'] >= 5) or
+                                       (num == 2 and state['paddle2']['score'] >= 5)), None)
+                    if winner_id:
+                        print(f"[DEBUG] Partida {self.match_id} terminada. Ganador: {winner_id}")
+                        await self.channel_layer.group_send(
+                            self.tournament_token,
+                            {
+                                'type': 'match_result',
+                                'match_id': self.match_id,
+                                'winner_id': winner_id,
+                            }
+                        )
+                    await self.send_game_update(f"Partida terminada")
+                    break
+
+                await self.send_game_update('Actualización de juego')
+                await asyncio.sleep(0.02)
+
+        except Exception as e:
+            print(f"[ERROR] Excepción en game_loop: {e}")
+            state['running'] = False
+            state['game_over'] = True
+            await self.send_game_update("Error en el juego")
+
+    async def send_game_update(self, message):
+        state = match_states.get(self.match_id, {})
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'game_update',
+                'state': state,
+                'message': message
+            }
+        )
+
+    async def game_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'game_update',
+            'state': event['state'],
+            'message': event.get('message', '')
         }))
