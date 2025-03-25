@@ -137,14 +137,19 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+DB_NAME = os.getenv("POSTGRES_DB")
+DB_PORT = os.getenv("POSTGRES_PORT")
+
 DATABASES = {
     'default': {
         'ENGINE': 'django_prometheus.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres',
+        'NAME': DB_NAME,
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
         'HOST': 'db',
-        'PORT': '5432',
+        'PORT': DB_PORT,
     }
 }
 
