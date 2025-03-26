@@ -300,7 +300,7 @@
     function sendPaddleMovement() {
         if (socket && socket.readyState === WebSocket.OPEN) {
             const now = Date.now();
-            if (now - lastPaddleUpdate >= 50) {
+            if (now - lastPaddleUpdate >= 20) { // Reducido de 50 ms a 20 ms
                 lastPaddleUpdate = now;
                 let direction;
                 if (keysPressed['w'] || keysPressed['W'] || keysPressed['ArrowUp']) {
@@ -336,9 +336,10 @@
         const deltaTime = Math.min(50, timestamp - lastFrameTime) / 1000;
         lastFrameTime = timestamp;
 
+        // Interpolación más rápida para la bola
+        ballX = lerp(ballX, targetBallX, BALL_INTERPOLATION_SPEED * deltaTime * 120);
+        ballY = lerp(ballY, targetBallY, BALL_INTERPOLATION_SPEED * deltaTime * 120);
         opponentPaddleY = lerp(opponentPaddleY, targetOpponentPaddleY, PADDLE_INTERPOLATION_SPEED * deltaTime * 60);
-        ballX = lerp(ballX, targetBallX, BALL_INTERPOLATION_SPEED * deltaTime * 60);
-        ballY = lerp(ballY, targetBallY, BALL_INTERPOLATION_SPEED * deltaTime * 60);
 
         console.log("[DEBUG] gameLoop - ballX:", ballX, "ballY:", ballY, "myPaddleY:", myPaddleY, "opponentPaddleY:", opponentPaddleY);
 

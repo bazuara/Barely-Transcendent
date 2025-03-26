@@ -615,10 +615,12 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             tournament_data = tournament_rooms[self.tournament_token]
             match_key = match_id.split('-')[-1]
             if match_key in tournament_data['matches']:
-                tournament_data['matches'][match_key]['winner'] = winner_id
-                print(f"[DEBUG] Ganador de {match_id}: {winner_id}")
+                # Solo actualiza el ganador si no está establecido
+                if tournament_data['matches'][match_key]['winner'] is None:
+                    tournament_data['matches'][match_key]['winner'] = winner_id
+                    print(f"[DEBUG] Ganador de {match_id}: {winner_id}")
 
-                if match_key == 'final':
+                if match_key == 'final' and tournament_data['status'] != 'finished':
                     tournament_data['status'] = 'finished'
                     results = {
                         'participants': await self.get_participants_info(tournament_data['participants']),
@@ -644,8 +646,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     )
                     print(f"[DEBUG] Torneo {self.tournament_token} finalizado. Resultados enviados.")
                 elif (tournament_data['matches']['match1']['winner'] is not None and 
-                      tournament_data['matches']['match2']['winner'] is not None and 
-                      tournament_data['status'] == 'in_progress'):
+                    tournament_data['matches']['match2']['winner'] is not None and 
+                    tournament_data['status'] == 'in_progress'):
                     await self.start_final(tournament_data)
 
     async def start_final(self, tournament_data):
@@ -846,32 +848,36 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             state = match_states[self.match_id]
             paddle_height = 0.2
             base_speed = 0.015
-            update_interval = 0.02
+            update_interval = 0.016  # Reducido de 0.02 a 0.016 para actualizaciones más frecuentes
 
             while state['running']:
                 state['ball_x'] += state['ball_dx']
                 state['ball_y'] += state['ball_dy']
 
+                # Lógica de rebote en los bordes superior e inferior
                 if state['ball_y'] <= 0 or state['ball_y'] >= 1:
                     state['ball_dy'] = -state['ball_dy'] * 1.02
                     state['ball_y'] = max(0.01, min(0.99, state['ball_y']))
 
-                if (state['ball_x'] <= 0.025 and state['ball_x'] >= -0.01 and
+                # Colisión con la paleta izquierda (player1)
+                if (state['ball_x'] <= 0.03 and state['ball_x'] >= -0.01 and
                     state['ball_y'] >= state['left_paddle'] - paddle_height/2 and
                     state['ball_y'] <= state['left_paddle'] + paddle_height/2):
                     state['ball_dx'] = -state['ball_dx'] * 1.1
-                    state['ball_x'] = 0.025
+                    state['ball_x'] = 0.03
                     relative_intersection = (state['ball_y'] - state['left_paddle']) / (paddle_height/2)
                     state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
-                if (state['ball_x'] >= 0.99 and state['ball_x'] <= 1.01 and
+                # Colisión con la paleta derecha (player2)
+                if (state['ball_x'] >= 0.97 and state['ball_x'] <= 1.01 and
                     state['ball_y'] >= state['right_paddle'] - paddle_height/2 and
                     state['ball_y'] <= state['right_paddle'] + paddle_height/2):
                     state['ball_dx'] = -state['ball_dx'] * 1.1
-                    state['ball_x'] = 0.99
+                    state['ball_x'] = 0.97
                     relative_intersection = (state['ball_y'] - state['right_paddle']) / (paddle_height/2)
                     state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
+                # Punto para player2 si la bola pasa por la izquierda
                 if state['ball_x'] < 0:
                     state['player2_score'] += 1
                     await self.channel_layer.group_send(
@@ -881,6 +887,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     self.reset_ball(state, base_speed)
                     await asyncio.sleep(1)
 
+                # Punto para player1 si la bola pasa por la derecha
                 if state['ball_x'] > 1:
                     state['player1_score'] += 1
                     await self.channel_layer.group_send(
@@ -890,6 +897,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     self.reset_ball(state, base_speed)
                     await asyncio.sleep(1)
 
+                # Finalizar partida si alguien llega a 5 puntos
                 if state['player1_score'] >= 5 or state['player2_score'] >= 5:
                     winner = 1 if state['player1_score'] >= 5 else 2
                     winner_id = state['player1_id'] if winner == 1 else state['player2_id']
@@ -916,6 +924,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     del match_states[self.match_id]
                     return
 
+                # Enviar actualización de la bola a los clientes
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {'type': 'update_ball', 'ball_position_x': state['ball_x'], 'ball_position_y': state['ball_y']}
