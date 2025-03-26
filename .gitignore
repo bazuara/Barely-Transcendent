@@ -1,3 +1,4 @@
 .env
 transcendence/staticfiles/
 **/contract_address.txt
+**/Tournament.json
