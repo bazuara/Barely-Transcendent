@@ -744,8 +744,8 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             player2_id = str(expected_players[1])
             match_states[self.match_id] = {
                 'ball_x': 0.5, 'ball_y': 0.5,
-                'ball_dx': 0.015 * random.choice([-1, 1]),
-                'ball_dy': 0.015 * 0.8 * random.choice([-1, 1]),
+                'ball_dx': 0.008 * random.choice([-1, 1]),
+                'ball_dy': 0.008 * 0.8 * random.choice([-1, 1]),
                 'player1_score': 0, 'player2_score': 0,
                 'left_paddle': 0.5, 'right_paddle': 0.5,
                 'player1_id': player1_id, 'player2_id': player2_id,
@@ -847,7 +847,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
         try:
             state = match_states[self.match_id]
             paddle_height = 0.2
-            base_speed = 0.015
+            base_speed = 0.008
             update_interval = 0.016  # Reducido de 0.02 a 0.016 para actualizaciones más frecuentes
 
             while state['running']:

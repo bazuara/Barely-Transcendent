@@ -100,17 +100,34 @@
         opponentId = opponentIdParam;
         myId = userIdParam;
         gameInitialized = true;
-
+    
+        // Ocultar la sala del torneo
+        const tournamentContainer = document.getElementById('tournament-container');
+        if (tournamentContainer) {
+            tournamentContainer.classList.add('d-none');
+        } else {
+            console.warn("[WARNING] No se encontró #tournament-container");
+        }
+    
+        // Mostrar el contenedor del juego
+        const gameContainer = document.getElementById('game-container');
+        if (gameContainer) {
+            gameContainer.classList.remove('d-none');
+        } else {
+            console.error("[ERROR] No se encontró #game-container");
+            return;
+        }
+    
         canvas = document.getElementById('pong-canvas');
         if (!canvas) {
             console.error("[ERROR] No se encontró el elemento canvas 'pong-canvas'");
             return;
         }
         ctx = canvas.getContext('2d');
-        canvas.width = 800;
-        canvas.height = 400;
+        canvas.width = 840;
+        canvas.height = 630;
         window.addEventListener('resize', resizeCanvas);
-
+    
         keysPressed = {};
         window.keydownHandler = (event) => {
             keysPressed[event.key] = true;
@@ -120,7 +137,7 @@
         };
         window.addEventListener('keydown', window.keydownHandler);
         window.addEventListener('keyup', window.keyupHandler);
-
+    
         paddleMoveInterval = setInterval(() => {
             if (!gameInitialized) return;
             const paddleStep = 0.025;
@@ -137,10 +154,7 @@
                 sendPaddleMovement();
             }
         }, 20);
-
-        const gameContainer = document.getElementById('game-container');
-        if (gameContainer) gameContainer.classList.remove('d-none');
-
+    
         const player1Name = document.getElementById('player1-name');
         const player2Name = document.getElementById('player2-name');
         const player1Avatar = document.getElementById('player1-avatar');
@@ -153,7 +167,7 @@
             player1Avatar.style.display = 'inline';
             player2Avatar.style.display = 'inline';
         }
-
+    
         showWaitingMessage();
         connectWebSocket();
     }
@@ -294,6 +308,16 @@
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
+    
+            // Restaurar la sala del torneo y ocultar el juego
+            const tournamentContainer = document.getElementById('tournament-container');
+            if (tournamentContainer) {
+                tournamentContainer.classList.remove('d-none');
+            }
+            const gameContainer = document.getElementById('game-container');
+            if (gameContainer) {
+                gameContainer.classList.add('d-none');
+            }
         }
     }
 
@@ -323,7 +347,25 @@
         if (!canvas) return;
         const container = canvas.parentElement;
         if (!container) return;
-        canvas.width = container.clientWidth;
+    
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const aspectRatio = 2 / 1;
+        const dpr = window.devicePixelRatio || 1; // Densidad de píxeles
+    
+        canvas.style.width = `${containerWidth}px`;
+        canvas.style.height = `${containerWidth / aspectRatio}px`;
+        canvas.width = containerWidth * dpr;
+        canvas.height = (containerWidth / aspectRatio) * dpr;
+    
+        if (canvas.height > containerHeight) {
+            canvas.style.height = `${containerHeight}px`;
+            canvas.style.width = `${containerHeight * aspectRatio}px`;
+            canvas.width = containerHeight * aspectRatio * dpr;
+            canvas.height = containerHeight * dpr;
+        }
+    
+        ctx.scale(dpr, dpr); // Escala el contexto para alta resolución
     }
 
     function lerp(start, end, factor) {
@@ -363,6 +405,14 @@
         ctx.beginPath();
         ctx.arc(ballX * canvas.width, ballY * canvas.height, BALL_RADIUS, 0, Math.PI * 2);
         ctx.fill();
+
+        //Dibujar puntajes
+        ctx.font = `${20 * (canvas.width / 840)}px Arial`; // Escala la fuente proporcionalmente
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${myScore}`, 10, 30 * (canvas.height / 430)); // Esquina superior izquierda
+        ctx.textAlign = 'right';
+        ctx.fillText(`${opponentScore}`, canvas.width - 10, 30 * (canvas.height / 430)); // Esquina superior derecha
 
         animationFrameId = requestAnimationFrame(gameLoop);
     }
