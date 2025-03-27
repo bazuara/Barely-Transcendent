@@ -304,27 +304,26 @@
         }
     
         if (data.type === 'game_over') {
-            console.log("[DEBUG] Juego terminado, mostrando resultado");
+            console.log("[DEBUG] Juego terminado, mostrando resultado:", data);
             const gameMessage = document.getElementById('game-message');
-            const isWinner = myId === data.winner; // Determinar si soy el ganador
-            const winnerMessage = isWinner ? '¡Has ganado!' : 'El oponente ha ganado';
-    
+            const isWinner = String(myId) === (data.winner === 1 ? String(data.player1_id) : String(data.player2_id));
+            const winnerMessage = data.message || (isWinner ? '¡Victoria!' : 'Has perdido');
+        
             if (gameMessage) {
                 gameMessage.innerHTML = `
                     <h3 class="text-center">¡Fin de la partida!</h3>
                     <p class="text-center">${winnerMessage}</p>
-                    <p class="text-center">Puntuación: ${myScore} - ${opponentScore}</p>
+                    <p class="text-center">Puntuación: ${data.player1_score} - ${data.player2_score}</p>
                 `;
                 gameMessage.classList.remove('d-none');
             }
-    
+        
             gameInitialized = false;
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-    
-            // Ocultar el canvas y mostrar el contenedor del torneo
+        
             const gameContainer = document.getElementById('game-container');
             const tournamentContainer = document.getElementById('tournament-container');
             if (gameContainer) {
@@ -332,8 +331,14 @@
             }
             if (tournamentContainer) {
                 tournamentContainer.classList.remove('d-none');
-                // Mostrar un mensaje provisional para el perdedor
-                if (!isWinner && matchId.includes('-match')) { // Solo para perdedores de match1 o match2
+                if (isWinner && matchId.includes('-match')) {  // Ganador de match1 o match2
+                    tournamentContainer.innerHTML = `
+                        <div class="text-center">
+                            <h3>¡Has ganado el primer partido!</h3>
+                            <p>Espera a que tu futuro oponente termine su partida antes de comenzar la final.</p>
+                        </div>
+                    `;
+                } else if (!isWinner && matchId.includes('-match')) {  // Perdedor de match1 o match2
                     tournamentContainer.innerHTML = `
                         <div class="text-center">
                             <h3>Fin de tu participación</h3>
@@ -341,6 +346,7 @@
                         </div>
                     `;
                 }
+                // Si es la final, dejamos que 'tournament_results' maneje el contenedor
             }
         }
     }

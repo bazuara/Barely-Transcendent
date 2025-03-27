@@ -389,12 +389,97 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     tournament_data['creator'] = tournament_data['participants'][0]
                     print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
                 
-                await self.send_tournament_info()
+                # Si el torneo ya comenzó, manejar desconexión como derrota
+                if tournament_data['status'] in ['in_progress', 'final']:
+                    await self.handle_tournament_disconnect(tournament_data)
+                else:
+                    await self.send_tournament_info()
                 
                 if not tournament_data['participants']:
                     del tournament_rooms[self.tournament_token]
                     print(f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
             await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
+
+    async def handle_tournament_disconnect(self, tournament_data):
+        """Maneja la desconexión de un jugador en un torneo en curso."""
+        user_id_str = str(self.user.internal_id)
+        match_found = False
+
+        # Revisar todos los matches del torneo
+        for match_key in ['match1', 'match2', 'final']:
+            match_data = tournament_data['matches'][match_key]
+            players = match_data['players']
+            if user_id_str in [str(p) for p in players]:
+                match_found = True
+                match_id = f"{self.tournament_token}-{match_key}"
+                match_group_name = f"match_{match_id}"  # Grupo específico del match
+                
+                # Si el match ya tiene ganador, ignorar
+                if match_data['winner']:
+                    print(f"[DEBUG] {match_id} ya tiene ganador: {match_data['winner']}, ignorando desconexión")
+                    continue
+
+                # Determinar oponente
+                opponent_id = next(p for p in players if str(p) != user_id_str)
+                
+                # Si la partida está en curso (estado existe en match_states)
+                if match_id in match_states:
+                    state = match_states[match_id]
+                    state['running'] = False
+                    if 'ball_task' in state:
+                        state['ball_task'].cancel()
+                    
+                    # Asignar victoria al oponente
+                    winner_id = opponent_id
+                    state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
+                    state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
+                    
+                    await self.channel_layer.group_send(
+                        match_group_name,  # Usar el grupo del match
+                        {
+                            'type': 'game_over',
+                            'winner': 1 if state['player1_id'] == winner_id else 2,
+                            'player1_id': state['player1_id'],
+                            'player2_id': state['player2_id'],
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score'],
+                            'message': 'El oponente se ha desconectado. ¡Has ganado!'
+                        }
+                    )
+                    await self.channel_layer.group_send(
+                        self.tournament_token,
+                        {
+                            'type': 'match_result',
+                            'match_id': match_id,
+                            'winner_id': int(winner_id)
+                        }
+                    )
+                    del match_states[match_id]
+                    print(f"[DEBUG] {match_id} terminado por desconexión. Ganador: {winner_id}")
+                
+                # Si la partida aún no ha comenzado
+                else:
+                    match_data['winner'] = opponent_id
+                    print(f"[DEBUG] {match_id} marcado como perdido por desconexión. Ganador: {opponent_id}")
+                    await self.channel_layer.group_send(
+                        self.tournament_token,
+                        {
+                            'type': 'match_result',
+                            'match_id': match_id,
+                            'winner_id': int(opponent_id)
+                        }
+                    )
+                    # Notificar al oponente si está conectado
+                    if opponent_id in tournament_connections:
+                        await tournament_connections[opponent_id].send(text_data=json.dumps({
+                            'type': 'start_tournament',
+                            'match_id': match_id,
+                            'opponent_id': user_id_str,
+                            'user_id': opponent_id
+                        }))
+
+        if not match_found:
+            print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -659,16 +744,25 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         tournament_data['matches']['final']['players'] = finalists
         final_match_id = f"{self.tournament_token}-final"
 
+        # Pequeño retraso para permitir que el mensaje de victoria se vea
+        await asyncio.sleep(3)  # 3 segundos de espera
+
+        # Enviar countdown sincronizado a los finalistas
         for i in range(5, 0, -1):
-            await self.channel_layer.group_send(
-                self.tournament_token,
-                {
-                    'type': 'countdown_to_final',
-                    'seconds': i,
-                    'final_match_id': final_match_id
-                }
-            )
-            await asyncio.sleep(1)
+            tasks = []
+            for player_id in finalists:
+                if player_id in tournament_connections:
+                    tasks.append(
+                        tournament_connections[player_id].send(text_data=json.dumps({
+                            'type': 'countdown_to_final',
+                            'seconds': i,
+                            'final_match_id': final_match_id
+                        }))
+                    )
+            if tasks:
+                await asyncio.gather(*tasks)  # Enviar a todos los finalistas simultáneamente
+            await asyncio.sleep(1)  # Esperar 1 segundo entre cada número del conteo
+        
 
         for player_id in finalists:
             if player_id in tournament_connections:
@@ -766,17 +860,40 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             if user_id_str in state['players']:
                 del state['players'][user_id_str]
                 state['ready'] -= 1
-                state['running'] = False
-                if 'ball_task' in state:
-                    state['ball_task'].cancel()
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        'type': 'player_disconnected',
-                        'player_id': self.user_id
-                    }
-                )
-                if state['ready'] == 0:
+                
+                if state['running']:
+                    # Partida en curso: dar victoria al oponente
+                    state['running'] = False
+                    if 'ball_task' in state:
+                        state['ball_task'].cancel()
+                    
+                    winner_id = state['player1_id'] if user_id_str == state['player2_id'] else state['player2_id']
+                    state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
+                    state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
+                    
+                    await self.channel_layer.group_send(
+                        self.room_group_name,
+                        {
+                            'type': 'game_over',
+                            'winner': 1 if state['player1_id'] == winner_id else 2,
+                            'player1_id': state['player1_id'],
+                            'player2_id': state['player2_id'],
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score'],
+                            'message': 'El oponente se ha desconectado. ¡Has ganado!'
+                        }
+                    )
+                    await self.channel_layer.group_send(
+                        self.tournament_token,
+                        {
+                            'type': 'match_result',
+                            'match_id': self.match_id,
+                            'winner_id': int(winner_id)
+                        }
+                    )
+                    del match_states[self.match_id]
+                    print(f"[DEBUG] {self.match_id} terminado por desconexión. Ganador: {winner_id}")
+                elif state['ready'] == 0:
                     del match_states[self.match_id]
                     print(f"[DEBUG] Estado de {self.match_id} eliminado por desconexión total")
 
