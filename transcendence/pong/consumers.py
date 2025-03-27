@@ -390,7 +390,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
                 
                 # Si el torneo ya comenzó, manejar desconexión como derrota
-                if tournament_data['status'] in ['in_progress', 'final']:
+                if tournament_data['status'] in ['in_progress', 'final', 'finished']:
                     await self.handle_tournament_disconnect(tournament_data)
                 else:
                     await self.send_tournament_info()
@@ -429,18 +429,26 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     if 'ball_task' in state:
                         state['ball_task'].cancel()
                     
+                    # Asegurar que todos los IDs sean strings
+                    winner_id = str(opponent_id)
+                    state_player1_id = str(state['player1_id'])
+                    state_player2_id = str(state['player2_id'])
+                    
                     # Asignar victoria al oponente
-                    winner_id = opponent_id
-                    state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
-                    state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
+                    state['player1_score'] = 5 if state_player1_id == winner_id else 0
+                    state['player2_score'] = 5 if state_player2_id == winner_id else 0
+                    
+                    # Calcular winner (1 para player1, 2 para player2)
+                    winner = 1 if state_player1_id == winner_id else 2
+                    print(f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
                     
                     await self.channel_layer.group_send(
-                        match_group_name,  # Usar el grupo del match
+                        match_group_name,
                         {
                             'type': 'game_over',
-                            'winner': 1 if state['player1_id'] == winner_id else 2,
-                            'player1_id': state['player1_id'],
-                            'player2_id': state['player2_id'],
+                            'winner': winner,
+                            'player1_id': state_player1_id,
+                            'player2_id': state_player2_id,
                             'player1_score': state['player1_score'],
                             'player2_score': state['player2_score'],
                             'message': 'El oponente se ha desconectado. ¡Has ganado!'
@@ -478,8 +486,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                             'user_id': opponent_id
                         }))
 
-        if not match_found:
-            print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
+            if not match_found:
+                print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -870,6 +878,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     winner_id = state['player1_id'] if user_id_str == state['player2_id'] else state['player2_id']
                     state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
                     state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
+                    print(f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
                     
                     await self.channel_layer.group_send(
                         self.room_group_name,

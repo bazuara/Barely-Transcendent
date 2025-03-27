@@ -304,9 +304,17 @@
         }
     
         if (data.type === 'game_over') {
-            console.log("[DEBUG] Juego terminado, mostrando resultado:", data);
+            console.log("[DEBUG] Juego terminado, mostrando resultado:", JSON.stringify(data));
             const gameMessage = document.getElementById('game-message');
-            const isWinner = String(myId) === (data.winner === 1 ? String(data.player1_id) : String(data.player2_id));
+            // Asegurarnos de que todos los IDs sean strings y depurar
+            const myIdStr = String(myId);
+            const player1IdStr = String(data.player1_id);
+            const player2IdStr = String(data.player2_id);
+            const winnerIdStr = data.winner === 1 ? player1IdStr : player2IdStr;
+            const isWinner = myIdStr === winnerIdStr;
+            console.log("[DEBUG] Calculando isWinner - myId:", myIdStr, "winner:", data.winner, "player1_id:", player1IdStr, "player2_id:", player2IdStr, "isWinner:", isWinner);
+            
+            // Usar data.message si existe, o fallback según isWinner
             const winnerMessage = data.message || (isWinner ? '¡Victoria!' : 'Has perdido');
         
             if (gameMessage) {
