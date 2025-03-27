@@ -167,13 +167,6 @@
                 <p>La final comenzará en ${seconds} segundos...</p>
             </div>
         `;
-
-        if (seconds === 1) {
-            setTimeout(() => {
-                console.log("[DEBUG] Iniciando final:", finalMatchId);
-                startTournamentMatch(finalMatchId, null, null);
-            }, 1000);
-        }
     }
 
     function updateTournamentUI() {

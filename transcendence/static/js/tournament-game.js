@@ -40,11 +40,12 @@
             cancelAnimationFrame(animationFrameId);
             animationFrameId = null;
         }
-        if (socket && socket.readyState !== WebSocket.CLOSED) {
-            socket.close();
-            socket = null;
-            console.log("[DEBUG] WebSocket de torneo cerrado");
-        }
+        //NO cerrar el socket para mantener la conexión entre partidas
+        //if (socket && socket.readyState !== WebSocket.CLOSED) {
+        //    socket.close();
+        //    socket = null;
+        //    console.log("[DEBUG] WebSocket de torneo cerrado");
+        //}
         if (paddleMoveInterval) {
             clearInterval(paddleMoveInterval);
             paddleMoveInterval = null;
@@ -59,7 +60,8 @@
         myScore = 0;
         opponentScore = 0;
         myPlayerNumber = null;
-        myId = null;
+        //NO resetear myId para mantenerlo entre partidas
+        //myId = null;
         opponentId = null;
         myName = null;
         myAvatar = null;
@@ -98,7 +100,7 @@
         cleanupTournamentGame();
         matchId = matchIdParam;
         opponentId = opponentIdParam;
-        myId = userIdParam;
+        myId = userIdParam || myId;
         gameInitialized = true;
     
         // Ocultar la sala del torneo
@@ -127,6 +129,16 @@
         canvas.width = 840;
         canvas.height = 630;
         window.addEventListener('resize', resizeCanvas);
+        // Inicializar posiciones
+        myPaddleY = 0.5;
+        opponentPaddleY = 0.5;
+        ballX = 0.5;
+        ballY = 0.5;
+        targetBallX = 0.5;
+        targetBallY = 0.5;
+        targetOpponentPaddleY = 0.5;
+        myScore = 0;
+        opponentScore = 0;
     
         keysPressed = {};
         window.keydownHandler = (event) => {
@@ -294,8 +306,10 @@
         if (data.type === 'game_over') {
             console.log("[DEBUG] Juego terminado, mostrando resultado");
             const gameMessage = document.getElementById('game-message');
+            const isWinner = myId === data.winner; // Determinar si soy el ganador
+            const winnerMessage = isWinner ? '¡Has ganado!' : 'El oponente ha ganado';
+    
             if (gameMessage) {
-                const winnerMessage = myId === data.winner ? '¡Has ganado!' : 'El oponente ha ganado';
                 gameMessage.innerHTML = `
                     <h3 class="text-center">¡Fin de la partida!</h3>
                     <p class="text-center">${winnerMessage}</p>
@@ -303,20 +317,30 @@
                 `;
                 gameMessage.classList.remove('d-none');
             }
+    
             gameInitialized = false;
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
     
-            // Restaurar la sala del torneo y ocultar el juego
-            const tournamentContainer = document.getElementById('tournament-container');
-            if (tournamentContainer) {
-                tournamentContainer.classList.remove('d-none');
-            }
+            // Ocultar el canvas y mostrar el contenedor del torneo
             const gameContainer = document.getElementById('game-container');
+            const tournamentContainer = document.getElementById('tournament-container');
             if (gameContainer) {
                 gameContainer.classList.add('d-none');
+            }
+            if (tournamentContainer) {
+                tournamentContainer.classList.remove('d-none');
+                // Mostrar un mensaje provisional para el perdedor
+                if (!isWinner && matchId.includes('-match')) { // Solo para perdedores de match1 o match2
+                    tournamentContainer.innerHTML = `
+                        <div class="text-center">
+                            <h3>Fin de tu participación</h3>
+                            <p>Has perdido el partido. Espera los resultados finales del torneo.</p>
+                        </div>
+                    `;
+                }
             }
         }
     }
