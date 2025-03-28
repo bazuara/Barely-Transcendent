@@ -39,4 +39,5 @@ tomlkit==0.13.2
 tqdm==4.67.1
 typing_extensions==4.12.2
 urllib3==2.3.0
+web3==7.9.0
 whitenoise==6.9.0

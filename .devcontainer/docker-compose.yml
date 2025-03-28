@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ../..:/workspaces:cached      
+      - ../..:/workspaces:cached
+      - ../blockchain/build:/app/build
     networks:
       - barely_a_network
     command: sleep infinity
@@ -55,6 +56,45 @@ services:
       - barely_a_network
     depends_on:
       - prometheus
+
+  ganache:
+    build:
+      context: ../blockchain
+      dockerfile: Dockerfile.ganache
+    container_name: ganache
+    command: ganache-cli -h 0.0.0.0 -p 8545 -i 5777
+    ports:
+      - "8545:8545"
+    networks:
+      - barely_a_network
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+      start_interval: 5s
+    restart: always
+
+  truffle:
+    build:
+      context: ../blockchain
+      dockerfile: Dockerfile.truffle
+    container_name: truffle
+    command: truffle migrate --network development
+    volumes:
+      - ../blockchain/build:/app/build
+    depends_on:
+      ganache:
+        condition: service_healthy
+    networks:
+      - barely_a_network
+    working_dir: /app
+    restart: on-failure
+    environment:
+      - HOST=ganache
+      - PORT=8545
+      - NETWORK_ID=5777
 
 networks:
   barely_a_network:
