@@ -4,6 +4,7 @@
     let participants = [];
     let creatorId = null;
     let showStartButton = false;
+    let tournamentFinished = false;
 
     function initTournament(forceReinit = false) {
         if (!forceReinit && window.tournamentInitialized) {
@@ -16,6 +17,7 @@
         connectWebSocket();
         setupTournamentButtons();
         window.tournamentInitialized = true;
+        tournamentFinished = false; // Resetear al iniciar
 
         document.addEventListener('htmx:beforeRequest', handleNavigation);
     }
@@ -30,7 +32,9 @@
         participants = [];
         creatorId = null;
         showStartButton = false;
+        tournamentFinished = false; // Resetear al limpiar
         updateTournamentUI();
+        window.cleanupTournamentGame(); // Limpiar el juego también
         window.tournamentInitialized = false;
     }
 
@@ -72,23 +76,44 @@
     function handleWebSocketMessage(data) {
         switch (data.type) {
             case 'tournament_info':
-                tournamentToken = data.token;
-                participants = data.participants;
-                creatorId = data.creator;
-                showStartButton = data.show_start_button || false;
-                console.log("[DEBUG] Actualización recibida - Token:", tournamentToken, "Creador:", creatorId, "Show Start Button:", showStartButton);
-                updateTournamentUI();
+                if (!tournamentFinished) {
+                    tournamentToken = data.token;
+                    participants = data.participants;
+                    creatorId = data.creator;
+                    showStartButton = data.show_start_button || false;
+                    console.log("[DEBUG] Actualización recibida - Token:", tournamentToken, "Creador:", creatorId, "Show Start Button:", showStartButton);
+                    updateTournamentUI();
+                } else {
+                    console.log("[DEBUG] Ignorando tournament_info porque el torneo ya terminó");
+                }
                 break;
             case 'start_tournament':
-                console.log("[DEBUG] Iniciando partida del torneo - Match ID:", data.match_id, "Oponente ID:", data.opponent_id, "User ID:", data.user_id);
-                startTournamentMatch(data.match_id, data.opponent_id, data.user_id);
+                if (!tournamentFinished) {
+                    console.log("[DEBUG] Iniciando partida del torneo - Match ID:", data.match_id, "Oponente ID:", data.opponent_id, "User ID:", data.user_id);
+                    startTournamentMatch(data.match_id, data.opponent_id, data.user_id);
+                } else {
+                    console.log("[DEBUG] Ignorando start_tournament porque el torneo ya terminó");
+                }
                 break;
             case 'countdown_to_final':
-                console.log("[DEBUG] Contador para la final - Segundos restantes:", data.seconds, "Final Match ID:", data.final_match_id);
-                showCountdown(data.seconds, data.final_match_id);
+                if (!tournamentFinished) {
+                    console.log("[DEBUG] Contador para la final - Segundos restantes:", data.seconds, "Final Match ID:", data.final_match_id);
+                    showCountdown(data.seconds, data.final_match_id);
+                } else {
+                    console.log("[DEBUG] Ignorando countdown_to_final porque el torneo ya terminó");
+                }
                 break;
             case 'tournament_results':
                 console.log("[DEBUG] Resultados del torneo recibidos:", data.results);
+                tournamentFinished = true;
+                // Limpiar el estado del juego sin cerrar el WebSocket
+                window.cleanupTournamentGame();
+                // Forzar la limpieza del contenedor del juego
+                const gameContainer = document.getElementById('game-container');
+                if (gameContainer) {
+                    gameContainer.classList.add('d-none');
+                }
+                // Mostrar resultados
                 displayTournamentResults(data.results);
                 break;
             case 'error':
@@ -100,6 +125,8 @@
     function createTournament() {
         if (socket && socket.readyState === WebSocket.OPEN) {
             console.log("[DEBUG] Creando torneo...");
+            // Resetear el estado del torneo terminado
+            tournamentFinished = false; // A ver si con esto soluciono lo de crear torneo después de que termina uno
             setTimeout(() => {
                 socket.send(JSON.stringify({
                     action: 'create_tournament'
@@ -145,6 +172,10 @@
     }
 
     function startTournamentMatch(matchId, opponentId, userId) {
+        if (tournamentFinished) {
+            console.log("[DEBUG] Ignorando inicio de partida porque el torneo ya terminó");
+            return;
+        }
         if (typeof window.startTournamentMatch === 'function') {
             window.startTournamentMatch(matchId, opponentId, userId);
         } else {

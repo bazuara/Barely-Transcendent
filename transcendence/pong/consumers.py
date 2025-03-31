@@ -374,6 +374,11 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         print(f"[DEBUG] Conexión registrada - Tournament Connections: {list(tournament_connections.keys())}")
         self.tournament_token = None
 
+    async def start_tournament(self, event):
+        # Ignorar el mensaje en el backend, ya que lo maneja el frontend
+        print(f"[DEBUG] Mensaje start_tournament recibido en backend y ignorado: {event}")
+        pass
+
     async def disconnect(self, close_code):
         if self.user.internal_id in tournament_connections:
             del tournament_connections[self.user.internal_id]
@@ -384,12 +389,58 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             if self.user.internal_id in tournament_data['participants']:
                 tournament_data['participants'].remove(self.user.internal_id)
                 print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}, Participants: {tournament_data['participants']}")
-                
+
+                # Si es la final y el usuario es un finalista
+                if tournament_data['status'] == 'final':
+                    finalists = tournament_data['matches']['final']['players']
+                    user_id_str = str(self.user.internal_id)
+                    final_match_id = f"{self.tournament_token}-final"
+                    if user_id_str in [str(p) for p in finalists]:
+                        # Si el partido no ha comenzado o está en countdown
+                        if (tournament_data['matches']['final']['winner'] is None and 
+                            (final_match_id not in match_states or not match_states[final_match_id]['running'])):
+                            winner_id = next(p for p in finalists if str(p) != user_id_str)
+                            tournament_data['matches']['final']['winner'] = winner_id
+                            tournament_data['status'] = 'finished'
+
+                            # Limpiar estado si existe
+                            if final_match_id in match_states:
+                                if 'ball_task' in match_states[final_match_id]:
+                                    match_states[final_match_id]['ball_task'].cancel()
+                                del match_states[final_match_id]
+
+                            # Enviar resultados finales directamente
+                            results = {
+                                'participants': await self.get_participants_info(tournament_data['participants']),
+                                'match1': {
+                                    'players': await self.get_participants_info(tournament_data['matches']['match1']['players']),
+                                    'winner': await self.get_participant_info(tournament_data['matches']['match1']['winner'])
+                                },
+                                'match2': {
+                                    'players': await self.get_participants_info(tournament_data['matches']['match2']['players']),
+                                    'winner': await self.get_participant_info(tournament_data['matches']['match2']['winner'])
+                                },
+                                'final': {
+                                    'players': await self.get_participants_info(tournament_data['matches']['final']['players']),
+                                    'winner': await self.get_participant_info(winner_id)
+                                }
+                            }
+                            await self.channel_layer.group_send(
+                                self.tournament_token,
+                                {
+                                    'type': 'tournament_results',
+                                    'results': results
+                                }
+                            )
+                            print(f"[DEBUG] Finalista {user_id_str} desconectado antes/durante countdown. Resultados enviados. Ganador: {winner_id}")
+                            await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
+                            return  # Salir para evitar más procesamiento
+
+                # Resto del manejo existente
                 if tournament_data['creator'] == self.user.internal_id and tournament_data['participants']:
                     tournament_data['creator'] = tournament_data['participants'][0]
                     print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
                 
-                # Si el torneo ya comenzó, manejar desconexión como derrota
                 if tournament_data['status'] in ['in_progress', 'final', 'finished']:
                     await self.handle_tournament_disconnect(tournament_data)
                 else:
@@ -708,7 +759,6 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             tournament_data = tournament_rooms[self.tournament_token]
             match_key = match_id.split('-')[-1]
             if match_key in tournament_data['matches']:
-                # Solo actualiza el ganador si no está establecido
                 if tournament_data['matches'][match_key]['winner'] is None:
                     tournament_data['matches'][match_key]['winner'] = winner_id
                     print(f"[DEBUG] Ganador de {match_id}: {winner_id}")
@@ -727,7 +777,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         },
                         'final': {
                             'players': await self.get_participants_info(tournament_data['matches']['final']['players']),
-                            'winner': await self.get_participant_info(tournament_data['matches']['final']['winner'])
+                            'winner': await self.get_participant_info(winner_id)
                         }
                     }
                     await self.channel_layer.group_send(
@@ -742,6 +792,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     tournament_data['matches']['match2']['winner'] is not None and 
                     tournament_data['status'] == 'in_progress'):
                     await self.start_final(tournament_data)
+            else:
+                print(f"[DEBUG] Match {match_id} no encontrado en torneo {self.tournament_token}")
 
     async def start_final(self, tournament_data):
         tournament_data['status'] = 'final'
@@ -752,10 +804,58 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         tournament_data['matches']['final']['players'] = finalists
         final_match_id = f"{self.tournament_token}-final"
 
-        # Pequeño retraso para permitir que el mensaje de victoria se vea
-        await asyncio.sleep(3)  # 3 segundos de espera
+        await asyncio.sleep(3)
 
-        # Enviar countdown sincronizado a los finalistas
+        # Verificar conexiones antes del countdown
+        missing_players = [p for p in finalists if p not in tournament_connections]
+        if missing_players:
+            print(f"[DEBUG] Jugadores desconectados antes del countdown: {missing_players}")
+            if len(missing_players) == 1:
+                winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
+                tournament_data['matches']['final']['winner'] = winner_id
+                tournament_data['status'] = 'finished'
+                # Enviar resultados directamente
+                results = {
+                    'participants': await self.get_participants_info(tournament_data['participants']),
+                    'match1': {
+                        'players': await self.get_participants_info(tournament_data['matches']['match1']['players']),
+                        'winner': await self.get_participant_info(tournament_data['matches']['match1']['winner'])
+                    },
+                    'match2': {
+                        'players': await self.get_participants_info(tournament_data['matches']['match2']['players']),
+                        'winner': await self.get_participant_info(tournament_data['matches']['match2']['winner'])
+                    },
+                    'final': {
+                        'players': await self.get_participants_info(tournament_data['matches']['final']['players']),
+                        'winner': await self.get_participant_info(winner_id)
+                    }
+                }
+                await self.channel_layer.group_send(
+                    self.tournament_token,
+                    {
+                        'type': 'tournament_results',
+                        'results': results
+                    }
+                )
+                print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión antes del countdown. Resultados enviados.")
+                return
+            elif len(missing_players) == 2:
+                print(f"[DEBUG] Ambos finalistas desconectados, torneo {self.tournament_token} cancelado")
+                tournament_data['status'] = 'finished'
+                return
+
+        # Resto del código (countdown y start_tournament) sigue igual
+        tasks = []
+        for player_id in finalists:
+            tasks.append(
+                tournament_connections[player_id].send(text_data=json.dumps({
+                    'type': 'prepare_for_final',
+                    'final_match_id': final_match_id
+                }))
+            )
+        await asyncio.gather(*tasks)
+        await asyncio.sleep(1)
+
         for i in range(5, 0, -1):
             tasks = []
             for player_id in finalists:
@@ -767,10 +867,37 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                             'final_match_id': final_match_id
                         }))
                     )
-            if tasks:
-                await asyncio.gather(*tasks)  # Enviar a todos los finalistas simultáneamente
-            await asyncio.sleep(1)  # Esperar 1 segundo entre cada número del conteo
-        
+            if len(tasks) < 2:
+                missing_players = [p for p in finalists if p not in tournament_connections]
+                winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
+                tournament_data['matches']['final']['winner'] = winner_id
+                tournament_data['status'] = 'finished'
+                results = {
+                    'participants': await self.get_participants_info(tournament_data['participants']),
+                    'match1': {
+                        'players': await self.get_participants_info(tournament_data['matches']['match1']['players']),
+                        'winner': await self.get_participant_info(tournament_data['matches']['match1']['winner'])
+                    },
+                    'match2': {
+                        'players': await self.get_participants_info(tournament_data['matches']['match2']['players']),
+                        'winner': await self.get_participant_info(tournament_data['matches']['match2']['winner'])
+                    },
+                    'final': {
+                        'players': await self.get_participants_info(tournament_data['matches']['final']['players']),
+                        'winner': await self.get_participant_info(winner_id)
+                    }
+                }
+                await self.channel_layer.group_send(
+                    self.tournament_token,
+                    {
+                        'type': 'tournament_results',
+                        'results': results
+                    }
+                )
+                print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión durante countdown. Resultados enviados.")
+                return
+            await asyncio.gather(*tasks)
+            await asyncio.sleep(1)
 
         for player_id in finalists:
             if player_id in tournament_connections:
@@ -780,9 +907,9 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     'opponent_id': finalists[0] if player_id == finalists[1] else finalists[1],
                     'user_id': player_id
                 }))
+                print(f"[DEBUG] Enviado start_tournament a {player_id} para {final_match_id}")
 
         print(f"[DEBUG] Final iniciada: {final_match_id} ({finalists})")
-        await self.send_tournament_info()
 
     async def countdown_to_final(self, event):
         await self.send(text_data=json.dumps({

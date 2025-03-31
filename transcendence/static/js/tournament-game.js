@@ -302,7 +302,7 @@
                 score2Element.textContent = opponentScore;
             }
         }
-    
+
         if (data.type === 'game_over') {
             console.log("[DEBUG] Juego terminado, mostrando resultado:", JSON.stringify(data));
             const gameMessage = document.getElementById('game-message');
