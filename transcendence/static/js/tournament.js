@@ -126,7 +126,7 @@
         if (socket && socket.readyState === WebSocket.OPEN) {
             console.log("[DEBUG] Creando torneo...");
             // Resetear el estado del torneo terminado
-            tournamentFinished = false; // A ver si con esto soluciono lo de crear torneo después de que termina uno
+            tournamentFinished = false; 
             setTimeout(() => {
                 socket.send(JSON.stringify({
                     action: 'create_tournament'
