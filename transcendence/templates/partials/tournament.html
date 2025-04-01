@@ -1,0 +1,122 @@
+{% load static %}
+<h1 class="display-4 text-center">Torneos de Pong</h1>
+<p class="lead text-center">¡Organiza o únete a un torneo épico!</p>
+<div class="row justify-content-center">
+    <div class="col-md-4 mb-3">
+        <button id="create-tournament-btn" class="btn btn-primary btn-lg w-100">Crear Torneo</button>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="input-group">
+            <input type="text" id="tournament-token-input" class="form-control" placeholder="Ingresa el token" maxlength="8">
+            <button id="join-tournament-btn" class="btn btn-success">Unirse</button>
+        </div>
+    </div>
+</div>
+<div id="tournament-container" class="mt-4"></div>
+
+<!-- Contenedor del juego -->
+<div id="game-container" class="d-none mt-4" style="position: relative; margin: 1 auto;">
+    <div class="d-flex justify-content-between text-white mt-2">
+        <div>
+            <img id="player1-avatar" src="" alt="Avatar" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+            <span id="player1-name"></span>
+            <span>Puntuación: <span id="player1-score">0</span></span>
+        </div>
+        <div>
+            <span>Puntuación: <span id="player2-score">0</span></span>
+            <span id="player2-name" class="me-2"></span>
+            <img id="player2-avatar" src="" alt="Avatar" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover; display: none;">
+        </div>
+    </div>
+    <canvas id="pong-canvas" style="background: #000;"></canvas>
+    <div id="game-message" class="d-none position-absolute top-50 start-50 translate-middle text-white" style="z-index: 10;"></div>
+</div>
+
+<style>
+    #game-container {
+        width: 100%;
+        max-width: 840px;
+    }
+
+    #pong-canvas {
+        display: block;
+    }
+</style>
+
+<script>
+    function loadScript(url, callback) {
+        if (window[`${url}_loading`]) {
+            console.log(`[DEBUG] ${url} ya se está cargando en otra instancia`);
+            const checkScript = setInterval(() => {
+                if (window[`${url}_loaded`]) {
+                    clearInterval(checkScript);
+                    console.log(`[DEBUG] ${url} cargado por otra instancia, continuando...`);
+                    callback();
+                }
+            }, 100);
+            return;
+        }
+
+        window[`${url}_loading`] = true;
+        console.log(`[DEBUG] Cargando ${url} dinámicamente`);
+
+        fetch(url)
+            .then(response => response.text())
+            .then(scriptText => {
+                (new Function(scriptText))();
+                console.log(`[DEBUG] ${url} cargado y evaluado`);
+                window[`${url}_loaded`] = true;
+                window[`${url}_loading`] = false;
+                setTimeout(callback, 50);
+            })
+            .catch(error => {
+                console.error(`[ERROR] Error cargando ${url}:`, error);
+                window[`${url}_loading`] = false;
+            });
+    }
+
+    function loadTournamentScripts(callback) {
+        const tournamentScriptUrl = "{% static 'js/tournament.js' %}";
+        const tournamentGameScriptUrl = "{% static 'js/tournament-game.js' %}";
+
+        if (typeof initTournament === 'function') {
+            console.log("[DEBUG] initTournament ya está disponible, saltando carga de tournament.js");
+            loadTournamentGameScript();
+        } else {
+            loadScript(tournamentScriptUrl, loadTournamentGameScript);
+        }
+
+        function loadTournamentGameScript() {
+            if (typeof startTournamentMatch === 'function') {
+                console.log("[DEBUG] startTournamentMatch ya está disponible, saltando carga de tournament-game.js");
+                callback();
+            } else {
+                loadScript(tournamentGameScriptUrl, callback);
+            }
+        }
+    }
+
+    function setupTournament() {
+        console.log("[DEBUG] Configurando torneo...");
+        const timeout = setTimeout(() => {
+            console.error("[ERROR] Tiempo de espera agotado al cargar scripts del torneo");
+        }, 5000);
+        loadTournamentScripts(() => {
+            clearTimeout(timeout);
+            if (typeof initTournament === 'function' && typeof startTournamentMatch === 'function') {
+                initTournament(true);
+            } else {
+                console.error("[ERROR] initTournament o startTournamentMatch no están definidos después de cargar los scripts");
+            }
+        });
+    }
+
+    setupTournament();
+
+    document.addEventListener('htmx:afterSwap', (event) => {
+        if (event.target.id === 'tournament-container' || event.target.closest('#tournament-container')) {
+            console.log("[DEBUG] Partial de torneo cargado vía HTMX, configurando...");
+            setupTournament();
+        }
+    });
+</script>

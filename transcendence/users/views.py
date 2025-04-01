@@ -1,5 +1,5 @@
 import requests
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError, JsonResponse
 from .models import User
@@ -165,14 +165,14 @@ def logout(request):
 
 
 # Endpoint para simular el inicio de sesión durante las pruebas
-def mock_login(request):
-    # Obtén el usuario de prueba
-    user = User.objects.filter(intra_login="Test").first()
+def mock_login(request, username):
+    # Busca el usuario por intra_login
+    user = User.objects.filter(intra_login=username).first()
 
     if user:
-        # Simula la autenticación manualmente
-        request.session['user_id'] = user.internal_id  # Guarda el ID del usuario en la sesión
-        return JsonResponse({"status": "success", "message": "Mock login successful"})
+        # Guarda el ID del usuario en la sesión
+        request.session['user_id'] = user.internal_id  
+        return JsonResponse({"status": "success", "message": f"Mock login successful for {username}"})
     else:
         return JsonResponse({"status": "error", "message": "User not found"}, status=400)
 
