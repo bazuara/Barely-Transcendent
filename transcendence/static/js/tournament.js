@@ -209,11 +209,28 @@
     
         let html = '';
         if (tournamentToken) {
-            html += `<p class="text-center">Token de invitación: <strong>${tournamentToken}</strong></p>`;
-            html += '<p class="text-center text-muted">Ambos matches se juegan simultáneamente. Los ganadores avanzarán a la final.</p>';
+            // Primer row: Cuadro de información centrado
             html += '<div class="row justify-content-center">';
+            html += '<div class="col-md-6">';
+            html += '<div class="card mt-3">';
+            html += `<div class="card-header text-center">Token de invitación: <strong>${tournamentToken}</strong></div>`;
+            html += '<div class="card-body">';
+            html += '<ul class="list-group list-group-flush">';
+            html += '<li class="list-group-item">Ambos matches se juegan simultáneamente. Los ganadores avanzarán a la final.</li>';
+            html += '<li class="list-group-item">Se jugará al mejor de 5 puntos.</li>';
+            html += '<li class="list-group-item">Si un jugador se desconecta perderá automáticamente 5-0.</li>';
+            html += '</ul>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '</div>';
     
-            html += '<div class="col-md-6 mb-3"><h4>Match 1</h4><ul class="list-group">';
+            // Segundo row: Matches lado a lado
+            html += '<div class="row justify-content-center mt-4">';
+    
+            // Match 1 (izquierda)
+            html += '<div class="col-md-5 mb-3">';
+            html += '<h4 class="text-center">Match 1</h4><ul class="list-group">';
             const match1 = participants.slice(0, 2);
             if (match1.length === 0) {
                 html += '<li class="list-group-item text-muted">Esperando jugador 1...</li>';
@@ -239,7 +256,9 @@
             }
             html += '</ul></div>';
     
-            html += '<div class="col-md-6 mb-3"><h4>Match 2</h4><ul class="list-group">';
+            // Match 2 (derecha)
+            html += '<div class="col-md-5 mb-3">';
+            html += '<h4 class="text-center">Match 2</h4><ul class="list-group">';
             const match2 = participants.slice(2, 4);
             if (match2.length === 0) {
                 html += '<li class="list-group-item text-muted">Esperando jugador 3...</li>';
@@ -265,8 +284,9 @@
             }
             html += '</ul></div>';
     
-            html += '</div>';
+            html += '</div>'; // Cierre del segundo row
     
+            // Botón de inicio
             if (showStartButton) {
                 html += '<div class="text-center mt-3">';
                 const isFull = participants.length === 4;

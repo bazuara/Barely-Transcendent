@@ -7,6 +7,28 @@ from channels.db import database_sync_to_async
 from users.models import User
 from pong.models import Game
 from urllib import parse
+from web3 import Web3
+
+# Configuración de Web3 para la blockchain
+ganache_url = "http://ganache:8545"  # URL de Ganache, ajusta si usas otro nodo
+web3 = Web3(Web3.HTTPProvider(ganache_url))
+
+# Verificar conexión
+if not web3.is_connected():
+    print("[ERROR] No se pudo conectar a la blockchain")
+
+# Cargar el ABI del contrato
+with open('/app/build/contracts/Tournament.json') as f:
+    contract_json = json.load(f)
+    contract_abi = contract_json['abi']
+
+# Leer la dirección del contrato desde el archivo
+with open('/app/build/contract_address.txt', 'r') as file:
+    contract_address = file.read().strip()
+contract = web3.eth.contract(address=contract_address, abi=contract_abi)
+
+# Establecer cuenta predeterminada (usamos la primera cuenta de Ganache)
+web3.eth.default_account = web3.eth.accounts[0]
 
 # Estructuras globales para Pong
 player_connections = {}  # Mapea IDs de usuario a sus conexiones (PongConsumer)
@@ -17,6 +39,42 @@ active_games = {}       # Mapea room_ids a datos del juego
 tournament_rooms = {}    # Mapea token de torneo a datos del torneo
 tournament_connections = {}  # Mapea IDs de usuario a sus conexiones (TournamentConsumer)
 match_states = {}  # Mapea room_ids a datos del juego
+
+# Función para enviar datos a la blockchain
+async def save_tournament_to_blockchain(tournament_data):
+    try:
+        # Usar los IDs de los jugadores desde los partidos en lugar de participants
+        match1_players = tournament_data['matches']['match1']['players']
+        match2_players = tournament_data['matches']['match2']['players']
+
+        blockchain_data = {
+            "player_id_1": str(match1_players[0]),  # Primer jugador de match1
+            "player_id_2": str(match1_players[1]),  # Segundo jugador de match1
+            "player_id_3": str(match2_players[0]),  # Primer jugador de match2
+            "player_id_4": str(match2_players[1]),  # Segundo jugador de match2
+            "score_match_1_2": f"{tournament_data['matches']['match1']['player1_score']}-{tournament_data['matches']['match1']['player2_score']}",
+            "score_match_3_4": f"{tournament_data['matches']['match2']['player1_score']}-{tournament_data['matches']['match2']['player2_score']}",
+            "score_match_final": f"{tournament_data['matches']['final']['player1_score']}-{tournament_data['matches']['final']['player2_score']}"
+        }
+        
+        # Enviar transacción al contrato
+        tx_hash = contract.functions.saveMatch(
+            blockchain_data["player_id_1"],
+            blockchain_data["player_id_2"],
+            blockchain_data["player_id_3"],
+            blockchain_data["player_id_4"],
+            blockchain_data["score_match_1_2"],
+            blockchain_data["score_match_3_4"],
+            blockchain_data["score_match_final"]
+        ).transact()
+
+        # Esperar a que la transacción sea minada
+        receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        print(f"[DEBUG] Torneo guardado en blockchain. Tx Hash: {tx_hash.hex()}")
+        return receipt
+    except Exception as e:
+        print(f"[ERROR] Error al guardar en blockchain: {e}")
+        return None
 
 class PongConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -401,6 +459,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                             (final_match_id not in match_states or not match_states[final_match_id]['running'])):
                             winner_id = next(p for p in finalists if str(p) != user_id_str)
                             tournament_data['matches']['final']['winner'] = winner_id
+                            tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
+                            tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
                             tournament_data['status'] = 'finished'
 
                             # Limpiar estado si existe
@@ -433,6 +493,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                                 }
                             )
                             print(f"[DEBUG] Finalista {user_id_str} desconectado antes/durante countdown. Resultados enviados. Ganador: {winner_id}")
+                            # Enviar a blockchain en caso de desconexión en final
+                            await save_tournament_to_blockchain(tournament_data)
                             await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
                             return  # Salir para evitar más procesamiento
 
@@ -485,11 +547,10 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     state_player1_id = str(state['player1_id'])
                     state_player2_id = str(state['player2_id'])
                     
-                    # Asignar victoria al oponente
+                    # Asignar victoria al oponente con 5-0
                     state['player1_score'] = 5 if state_player1_id == winner_id else 0
                     state['player2_score'] = 5 if state_player2_id == winner_id else 0
                     
-                    # Calcular winner (1 para player1, 2 para player2)
                     winner = 1 if state_player1_id == winner_id else 2
                     print(f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
                     
@@ -510,22 +571,27 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         {
                             'type': 'match_result',
                             'match_id': match_id,
-                            'winner_id': int(winner_id)
+                            'winner_id': int(winner_id),
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score']
                         }
                     )
-                    del match_states[match_id]
-                    print(f"[DEBUG] {match_id} terminado por desconexión. Ganador: {winner_id}")
-                
+                    # No eliminamos match_states[match_id] aquí; lo dejamos a TournamentMatchConsumer
+                    
                 # Si la partida aún no ha comenzado
                 else:
                     match_data['winner'] = opponent_id
+                    match_data['player1_score'] = 5 if str(opponent_id) == str(players[0]) else 0
+                    match_data['player2_score'] = 5 if str(opponent_id) == str(players[1]) else 0
                     print(f"[DEBUG] {match_id} marcado como perdido por desconexión. Ganador: {opponent_id}")
                     await self.channel_layer.group_send(
                         self.tournament_token,
                         {
                             'type': 'match_result',
                             'match_id': match_id,
-                            'winner_id': int(opponent_id)
+                            'winner_id': int(opponent_id),
+                            'player1_score': match_data['player1_score'],
+                            'player2_score': match_data['player2_score']
                         }
                     )
                     # Notificar al oponente si está conectado
@@ -537,8 +603,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                             'user_id': opponent_id
                         }))
 
-            if not match_found:
-                print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
+        if not match_found:
+            print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -572,9 +638,9 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 'status': 'waiting',
                 'channel_group': self.tournament_token,
                 'matches': {
-                    'match1': {'players': [], 'winner': None},
-                    'match2': {'players': [], 'winner': None},
-                    'final': {'players': [], 'winner': None},
+                    'match1': {'players': [], 'winner': None, 'player1_score': 0, 'player2_score': 0},
+                    'match2': {'players': [], 'winner': None, 'player1_score': 0, 'player2_score': 0},
+                    'final': {'players': [], 'winner': None, 'player1_score': 0, 'player2_score': 0},
                 }
             }
             print(f"[DEBUG] Torneo creado por {self.user.internal_id}: {self.tournament_token}")
@@ -755,16 +821,23 @@ class TournamentConsumer(AsyncWebsocketConsumer):
     async def match_result(self, event):
         match_id = event['match_id']
         winner_id = event['winner_id']
+        player1_score = event.get('player1_score', 0)
+        player2_score = event.get('player2_score', 0)
         if self.tournament_token and self.tournament_token in tournament_rooms:
             tournament_data = tournament_rooms[self.tournament_token]
             match_key = match_id.split('-')[-1]
             if match_key in tournament_data['matches']:
                 if tournament_data['matches'][match_key]['winner'] is None:
                     tournament_data['matches'][match_key]['winner'] = winner_id
-                    print(f"[DEBUG] Ganador de {match_id}: {winner_id}")
+                    tournament_data['matches'][match_key]['player1_score'] = player1_score
+                    tournament_data['matches'][match_key]['player2_score'] = player2_score
+                    print(f"[DEBUG] Ganador de {match_id}: {winner_id}, Puntuación: {player1_score}-{player2_score}")
 
                 if match_key == 'final' and tournament_data['status'] != 'finished':
                     tournament_data['status'] = 'finished'
+                    tournament_data['matches']['final']['player1_score'] = player1_score
+                    tournament_data['matches']['final']['player2_score'] = player2_score
+
                     results = {
                         'participants': await self.get_participants_info(tournament_data['participants']),
                         'match1': {
@@ -788,9 +861,13 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         }
                     )
                     print(f"[DEBUG] Torneo {self.tournament_token} finalizado. Resultados enviados.")
+
+                    # Enviar los resultados a la blockchain
+                    await save_tournament_to_blockchain(tournament_data)
+
                 elif (tournament_data['matches']['match1']['winner'] is not None and 
-                    tournament_data['matches']['match2']['winner'] is not None and 
-                    tournament_data['status'] == 'in_progress'):
+                      tournament_data['matches']['match2']['winner'] is not None and 
+                      tournament_data['status'] == 'in_progress'):
                     await self.start_final(tournament_data)
             else:
                 print(f"[DEBUG] Match {match_id} no encontrado en torneo {self.tournament_token}")
@@ -813,6 +890,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             if len(missing_players) == 1:
                 winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
                 tournament_data['matches']['final']['winner'] = winner_id
+                tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
+                tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
                 tournament_data['status'] = 'finished'
                 # Enviar resultados directamente
                 results = {
@@ -838,13 +917,15 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     }
                 )
                 print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión antes del countdown. Resultados enviados.")
+                # Enviar a blockchain
+                await save_tournament_to_blockchain(tournament_data)
                 return
             elif len(missing_players) == 2:
                 print(f"[DEBUG] Ambos finalistas desconectados, torneo {self.tournament_token} cancelado")
                 tournament_data['status'] = 'finished'
                 return
 
-        # Resto del código (countdown y start_tournament) sigue igual
+        # Resto del código (countdown y start_tournament)
         tasks = []
         for player_id in finalists:
             tasks.append(
@@ -871,6 +952,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 missing_players = [p for p in finalists if p not in tournament_connections]
                 winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
                 tournament_data['matches']['final']['winner'] = winner_id
+                tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
+                tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
                 tournament_data['status'] = 'finished'
                 results = {
                     'participants': await self.get_participants_info(tournament_data['participants']),
@@ -895,6 +978,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     }
                 )
                 print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión durante countdown. Resultados enviados.")
+                # Enviar a blockchain
+                await save_tournament_to_blockchain(tournament_data)
                 return
             await asyncio.gather(*tasks)
             await asyncio.sleep(1)
@@ -997,7 +1082,7 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                 state['ready'] -= 1
                 
                 if state['running']:
-                    # Partida en curso: dar victoria al oponente
+                    # Partida en curso: dar victoria al oponente con 5-0
                     state['running'] = False
                     if 'ball_task' in state:
                         state['ball_task'].cancel()
@@ -1005,7 +1090,6 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     winner_id = state['player1_id'] if user_id_str == state['player2_id'] else state['player2_id']
                     state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
                     state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
-                    print(f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
                     
                     await self.channel_layer.group_send(
                         self.room_group_name,
@@ -1024,7 +1108,9 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                         {
                             'type': 'match_result',
                             'match_id': self.match_id,
-                            'winner_id': int(winner_id)
+                            'winner_id': int(winner_id),
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score']
                         }
                     )
                     del match_states[self.match_id]
@@ -1170,7 +1256,9 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                         {
                             'type': 'match_result',
                             'match_id': self.match_id,
-                            'winner_id': int(winner_id)
+                            'winner_id': int(winner_id),
+                            'player1_score': state['player1_score'],
+                            'player2_score': state['player2_score']
                         }
                     )
                     await self.save_game_results(self.match_id, state)
