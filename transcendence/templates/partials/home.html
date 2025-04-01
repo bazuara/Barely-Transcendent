@@ -34,9 +34,43 @@
     </div>
     
     <div class="row mt-4">
-        <div class="col-12 text-center">
-            <h4>Top 10 Jugadores</h4>
-            <p>Próximamente...</p>
+        <div class="col-12">
+            <h4 class="text-center mb-3">Top 10 Jugadores</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Foto</th>
+                            <th scope="col">Nombre</th>
+                            <th scope="col">Partidos Jugados</th>
+                            <th scope="col">Partidos Ganados</th>
+                            <th scope="col">Puntos Totales</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in top_players %}
+                        <tr>
+                            <th scope="row">{{ forloop.counter }}</th>
+                            <td>
+                                <img src="{{ player.intra_picture|default:'https://via.placeholder.com/50' }}" 
+                                     alt="{{ player.intra_login }}" 
+                                     class="rounded-circle" 
+                                     style="width: 50px; height: 50px; object-fit: cover;">
+                            </td>
+                            <td>{{ player.intra_login }}</td>
+                            <td>{{ player.games_played }}</td>
+                            <td>{{ player.games_won }}</td>
+                            <td>{{ player.total_points }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No hay jugadores disponibles aún.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
