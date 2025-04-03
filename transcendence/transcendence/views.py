@@ -20,9 +20,18 @@ def home(request):
         request.session.flush()
         return redirect('login')
 
+    # Obtener el Top 10 de jugadores por games_won
+    top_players = User.objects.order_by('-games_won')[:10]
+
+    # Preparar el contexto con el usuario y el ranking
+    context = {
+        'user': user,
+        'top_players': top_players,
+    }
+
     template = "partials/home.html" if request.htmx else "home.html"
 
-    return render(request, template)
+    return render(request, template, context)
 
 def about(request):
     template = "partials/about.html" if request.htmx else "about.html"
