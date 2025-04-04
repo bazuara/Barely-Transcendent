@@ -1,5 +1,7 @@
 {% load static %}
-<link rel="shortcut icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+<link rel="shortcut icon"
+      href="{% static 'favicon.ico' %}"
+      type="image/x-icon">
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -17,9 +19,7 @@
     </head>
     <body>
         <!-- Cargar el Header desde un partial -->
-        <div id="header-container">
-            {% include "partials/header.html" %}
-        </div>
+        <div id="header-container">{% include "partials/header.html" %}</div>
         <!-- Contenido dinámico -->
         <main id="content" class="container my-4">
             {% block content %}
@@ -27,20 +27,6 @@
         </main>
         <!-- Cargar el Footer desde un partial -->
         {% include "partials/footer.html" %}
-        <!-- Spinner de carga -->
-        <div id="loading"
-             class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center">
-            <div class="spinner-border text-light" role="status"></div>
-        </div>
-        <script>
-        document.body.addEventListener('htmx:beforeRequest', function() {
-            document.getElementById("loading").classList.remove("d-none");
-        });
-
-        document.body.addEventListener('htmx:afterRequest', function() {
-            document.getElementById("loading").classList.add("d-none");
-        });
-        </script>
         {% block extra_scripts %}{% endblock %}
     </body>
 </html>
