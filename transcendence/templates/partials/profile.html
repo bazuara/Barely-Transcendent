@@ -17,9 +17,16 @@
                     {% endif %}
                     <div class="row mb-4">
                         <div class="col-md-4 text-center">
-                            {% if user.intra_picture %}
+                            {% if user.internal_picture %}
+                                <img src="{{ user.internal_picture }}"
+                                     alt="{{ user.internal_login }}"
+                                     class="img-thumbnail mb-3"
+                                     style="width: 150px;
+                                            height: 150px;
+                                            object-fit: cover">
+                            {% elif user.intra_picture %}
                                 <img src="{{ user.intra_picture }}"
-                                     alt="{{ user.intra_login }}"
+                                     alt="{{ user.internal_login }}"
                                      class="img-thumbnail mb-3"
                                      style="width: 150px;
                                             height: 150px;
@@ -35,21 +42,14 @@
                         </div>
                         <div class="col-md-8">
                             <h4>Información del usuario</h4>
-                            <p>
-                                <strong>Nombre de usuario:</strong> {{ user.internal_login }}
-                            </p>
-                            <p>
-                                <strong>ID:</strong> {{ user.intra_id }}
-                            </p>
-                            <p>
-                                <strong>Usuario 42:</strong> {{ user.intra_login }}
-                            </p>
-                            <p>
-                                <strong>Nombre:</strong> {{ user.intra_name }} {{ user.intra_surname }}
-                            </p>
-                            <p>
-                                <strong>Registrado desde:</strong> {{ user.user_creation|date:"d/m/Y H:i" }}
-                            </p>
+                            <p><strong>Nombre de usuario:</strong> {{ user.internal_login }}</p>
+                            <p><strong>ID:</strong> {{ user.intra_id }}</p>
+                            <p><strong>Usuario 42:</strong> {{ user.intra_login }}</p>
+                            <p><strong>Nombre:</strong> {{ user.intra_name }} {{ user.intra_surname }}</p>
+                            <p><strong>Matches jugados:</strong> {{ user.games_played }}</p>
+                            <p><strong>Matches ganados:</strong> {{ user.games_won }}</p>
+                            <p><strong>Puntos marcados:</strong> {{ user.total_points }}</p>
+                            <p><strong>Registrado desde:</strong> {{ user.user_creation|date:"d/m/Y H:i" }}</p>
                         </div>
                     </div>
                     <form hx-post="{% url 'update_profile' %}"
@@ -67,14 +67,23 @@
                                    required>
                             <div class="form-text">Este es el nombre que se mostrará a otros usuarios.</div>
                         </div>
-                        <!-- Aquí se puede agregar la funcionalidad para cambiar la imagen de perfil más adelante -->
+                        <!-- Campo para el enlace de la imagen personalizada -->
+                        <div class="mb-3">
+                            <label for="internal_picture" class="form-label">Enlace de la imagen de perfil</label>
+                            <input type="url"
+                                   class="form-control"
+                                   id="internal_picture"
+                                   name="internal_picture"
+                                   value="{{ user.internal_picture|default:'' }}"
+                                   placeholder="Deja vacío para usar la imagen por defecto">
+                            <div class="form-text">Ingresa un enlace a una imagen (PNG, JPG o JPEG). Si lo dejas vacío, se usará tu imagen por defecto.</div>
+                        </div>
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a class="btn btn-secondary"
                                href="{% url 'home' %}"
                                hx-get="{% url 'home' %}"
                                hx-target="#content"
                                hx-push-url="true">Cancelar</a>
-                            {% comment %} self anonimize user button {% endcomment %}
                             <a class="btn btn-danger"
                                href="{% url 'anonimize' %}"
                                hx-get="{% url 'anonimize' %}"
