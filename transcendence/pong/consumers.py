@@ -37,10 +37,13 @@ active_games = {}       # Mapea room_ids a datos del juego
 
 # Estructuras globales para torneos
 tournament_rooms = {}    # Mapea token de torneo a datos del torneo
-tournament_connections = {}  # Mapea IDs de usuario a sus conexiones (TournamentConsumer)
+# Mapea IDs de usuario a sus conexiones (TournamentConsumer)
+tournament_connections = {}
 match_states = {}  # Mapea room_ids a datos del juego
 
 # Función para enviar datos a la blockchain
+
+
 async def save_tournament_to_blockchain(tournament_data):
     try:
         # Usar los IDs de los jugadores desde los partidos en lugar de participants
@@ -56,7 +59,7 @@ async def save_tournament_to_blockchain(tournament_data):
             "score_match_3_4": f"{tournament_data['matches']['match2']['player1_score']}-{tournament_data['matches']['match2']['player2_score']}",
             "score_match_final": f"{tournament_data['matches']['final']['player1_score']}-{tournament_data['matches']['final']['player2_score']}"
         }
-        
+
         # Enviar transacción al contrato
         tx_hash = contract.functions.saveMatch(
             blockchain_data["player_id_1"],
@@ -70,18 +73,20 @@ async def save_tournament_to_blockchain(tournament_data):
 
         # Esperar a que la transacción sea minada
         receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-        print(f"[DEBUG] Torneo guardado en blockchain. Tx Hash: {tx_hash.hex()}")
+        print(
+            f"[DEBUG] Torneo guardado en blockchain. Tx Hash: {tx_hash.hex()}")
         return receipt
     except Exception as e:
         print(f"[ERROR] Error al guardar en blockchain: {e}")
         return None
+
 
 class PongConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """Maneja la conexión de un jugador al WebSocket de Pong."""
         session = self.scope.get('session', {})
         user_id = session.get('user_id')
-        
+
         if not user_id:
             print(f"[DEBUG] No se encontró user_id en la sesión: {session}")
             await self.close(code=4001)
@@ -103,7 +108,8 @@ class PongConsumer(AsyncWebsocketConsumer):
 
         if self.user.internal_id not in waiting_players:
             waiting_players.append(self.user.internal_id)
-            print(f"[DEBUG] Jugador {self.user.internal_id} añadido a la cola: {waiting_players}")
+            print(
+                f"[DEBUG] Jugador {self.user.internal_id} añadido a la cola: {waiting_players}")
             await self.send(text_data=json.dumps({
                 'type': 'waiting',
                 'message': 'Esperando a otro jugador...'
@@ -120,13 +126,15 @@ class PongConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         """Maneja la desconexión de un jugador de Pong."""
         if not hasattr(self, 'user'):
-            print(f"[DEBUG] Desconexión sin usuario asignado. Código: {close_code}")
+            print(
+                f"[DEBUG] Desconexión sin usuario asignado. Código: {close_code}")
             return
 
-        print(f"[DEBUG] Desconexión de {self.user.internal_id}. Código: {close_code}")
+        print(
+            f"[DEBUG] Desconexión de {self.user.internal_id}. Código: {close_code}")
         if self.user.internal_id in player_connections:
             del player_connections[self.user.internal_id]
-        
+
         if self.user.internal_id in waiting_players:
             waiting_players.remove(self.user.internal_id)
             print(f"[DEBUG] {self.user.internal_id} eliminado de la cola")
@@ -144,7 +152,8 @@ class PongConsumer(AsyncWebsocketConsumer):
             )
             if self.room_id in active_games:
                 del active_games[self.room_id]
-                print(f"[DEBUG] Juego {self.room_id} terminado por desconexión")
+                print(
+                    f"[DEBUG] Juego {self.room_id} terminado por desconexión")
 
     async def receive(self, text_data):
         """Maneja mensajes recibidos del frontend para Pong."""
@@ -153,7 +162,8 @@ class PongConsumer(AsyncWebsocketConsumer):
 
         if action == 'move_paddle':
             if not self.room_id or self.room_id not in active_games:
-                print(f"[WARNING] Intento de mover paleta sin sala activa: {data}")
+                print(
+                    f"[WARNING] Intento de mover paleta sin sala activa: {data}")
                 return
             game_data = active_games[self.room_id]
             if data['player'] == 'player1' and self.user.internal_id == game_data['player1_id']:
@@ -216,7 +226,8 @@ class PongConsumer(AsyncWebsocketConsumer):
                     'left_paddle': 0.5, 'right_paddle': 0.5,
                     'player1_id': player1_id, 'player2_id': player2_id
                 }
-                active_games[room_id]['ball_task'] = asyncio.create_task(self.move_ball(room_id))
+                active_games[room_id]['ball_task'] = asyncio.create_task(
+                    self.move_ball(room_id))
 
                 await self.channel_layer.group_send(
                     room_id,
@@ -230,7 +241,8 @@ class PongConsumer(AsyncWebsocketConsumer):
                 print(f"[DEBUG] Partida iniciada: {room_id}")
             else:
                 waiting_players.extend([player1_id, player2_id])
-                print(f"[ERROR] Conexiones no encontradas: P1={player1_id}, P2={player2_id}")
+                print(
+                    f"[ERROR] Conexiones no encontradas: P1={player1_id}, P2={player2_id}")
         except Exception as e:
             waiting_players.extend([player1_id, player2_id])
             print(f"[ERROR] Error en matchmaking: {e}")
@@ -249,29 +261,35 @@ class PongConsumer(AsyncWebsocketConsumer):
 
                 if game_data['ball_y'] <= 0 or game_data['ball_y'] >= 1:
                     game_data['ball_dy'] = -game_data['ball_dy'] * 1.02
-                    game_data['ball_y'] = max(0.01, min(0.99, game_data['ball_y']))
+                    game_data['ball_y'] = max(
+                        0.01, min(0.99, game_data['ball_y']))
 
                 if (game_data['ball_x'] <= 0.025 and game_data['ball_x'] >= -0.01 and
                     game_data['ball_y'] >= game_data['left_paddle'] - paddle_height/2 and
-                    game_data['ball_y'] <= game_data['left_paddle'] + paddle_height/2):
+                        game_data['ball_y'] <= game_data['left_paddle'] + paddle_height/2):
                     game_data['ball_dx'] = -game_data['ball_dx'] * 1.1
                     game_data['ball_x'] = 0.025
-                    relative_intersection = (game_data['ball_y'] - game_data['left_paddle']) / (paddle_height/2)
-                    game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
+                    relative_intersection = (
+                        game_data['ball_y'] - game_data['left_paddle']) / (paddle_height/2)
+                    game_data['ball_dy'] = base_speed * \
+                        1.5 * relative_intersection
 
                 if (game_data['ball_x'] >= 0.99 and game_data['ball_x'] <= 1.01 and
                     game_data['ball_y'] >= game_data['right_paddle'] - paddle_height/2 and
-                    game_data['ball_y'] <= game_data['right_paddle'] + paddle_height/2):
+                        game_data['ball_y'] <= game_data['right_paddle'] + paddle_height/2):
                     game_data['ball_dx'] = -game_data['ball_dx'] * 1.1
                     game_data['ball_x'] = 0.99
-                    relative_intersection = (game_data['ball_y'] - game_data['right_paddle']) / (paddle_height/2)
-                    game_data['ball_dy'] = base_speed * 1.5 * relative_intersection
+                    relative_intersection = (
+                        game_data['ball_y'] - game_data['right_paddle']) / (paddle_height/2)
+                    game_data['ball_dy'] = base_speed * \
+                        1.5 * relative_intersection
 
                 if game_data['ball_x'] < 0:
                     game_data['player2_score'] += 1
                     await self.channel_layer.group_send(
                         room_id,
-                        {'type': 'update_score', 'player1_score': game_data['player1_score'], 'player2_score': game_data['player2_score']}
+                        {'type': 'update_score',
+                            'player1_score': game_data['player1_score'], 'player2_score': game_data['player2_score']}
                     )
                     self.reset_ball(game_data, base_speed)
                     await asyncio.sleep(1)
@@ -280,7 +298,8 @@ class PongConsumer(AsyncWebsocketConsumer):
                     game_data['player1_score'] += 1
                     await self.channel_layer.group_send(
                         room_id,
-                        {'type': 'update_score', 'player1_score': game_data['player1_score'], 'player2_score': game_data['player2_score']}
+                        {'type': 'update_score',
+                            'player1_score': game_data['player1_score'], 'player2_score': game_data['player2_score']}
                     )
                     self.reset_ball(game_data, base_speed)
                     await asyncio.sleep(1)
@@ -304,7 +323,8 @@ class PongConsumer(AsyncWebsocketConsumer):
 
                 await self.channel_layer.group_send(
                     room_id,
-                    {'type': 'update_ball', 'ball_position_x': game_data['ball_x'], 'ball_position_y': game_data['ball_y']}
+                    {'type': 'update_ball', 'ball_position_x':
+                        game_data['ball_x'], 'ball_position_y': game_data['ball_y']}
                 )
                 await asyncio.sleep(update_interval)
 
@@ -354,7 +374,7 @@ class PongConsumer(AsyncWebsocketConsumer):
                 'intra_picture': user.intra_picture
             }
         except User.DoesNotExist:
-            return {'id': user_id, 'intra_login': f'Usuario {user_id}', 'intra_picture': None}
+            return {'id': user_id, 'intra_login': f'Usuario {user_id}', 'intra_picture': '/static/default-avatar.png'}
 
     @database_sync_to_async
     def update_user_stats(self, user, points_scored, has_won):
@@ -409,6 +429,7 @@ class PongConsumer(AsyncWebsocketConsumer):
             'player2_score': event.get('player2_score', 0)
         }))
 
+
 class TournamentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         session = self.scope.get('session', {})
@@ -421,7 +442,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
         try:
             self.user = await database_sync_to_async(User.objects.get)(internal_id=user_id)
-            print(f"[DEBUG] Usuario autenticado en torneo - User ID: {self.user.internal_id}, Session: {session}")
+            print(
+                f"[DEBUG] Usuario autenticado en torneo - User ID: {self.user.internal_id}, Session: {session}")
         except User.DoesNotExist:
             print(f"[DEBUG] Usuario {user_id} no encontrado")
             await self.close(code=4002)
@@ -429,24 +451,28 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
         tournament_connections[self.user.internal_id] = self
-        print(f"[DEBUG] Conexión registrada - Tournament Connections: {list(tournament_connections.keys())}")
+        print(
+            f"[DEBUG] Conexión registrada - Tournament Connections: {list(tournament_connections.keys())}")
         self.tournament_token = None
 
     async def start_tournament(self, event):
         # Ignorar el mensaje en el backend, ya que lo maneja el frontend
-        print(f"[DEBUG] Mensaje start_tournament recibido en backend y ignorado: {event}")
+        print(
+            f"[DEBUG] Mensaje start_tournament recibido en backend y ignorado: {event}")
         pass
 
     async def disconnect(self, close_code):
         if self.user.internal_id in tournament_connections:
             del tournament_connections[self.user.internal_id]
-            print(f"[DEBUG] Conexión eliminada - User ID: {self.user.internal_id}, Remaining Connections: {list(tournament_connections.keys())}")
+            print(
+                f"[DEBUG] Conexión eliminada - User ID: {self.user.internal_id}, Remaining Connections: {list(tournament_connections.keys())}")
 
         if self.tournament_token and self.tournament_token in tournament_rooms:
             tournament_data = tournament_rooms[self.tournament_token]
             if self.user.internal_id in tournament_data['participants']:
                 tournament_data['participants'].remove(self.user.internal_id)
-                print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}, Participants: {tournament_data['participants']}")
+                print(
+                    f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}, Participants: {tournament_data['participants']}")
 
                 # Si es la final y el usuario es un finalista
                 if tournament_data['status'] == 'final':
@@ -455,18 +481,22 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     final_match_id = f"{self.tournament_token}-final"
                     if user_id_str in [str(p) for p in finalists]:
                         # Si el partido no ha comenzado o está en countdown
-                        if (tournament_data['matches']['final']['winner'] is None and 
-                            (final_match_id not in match_states or not match_states[final_match_id]['running'])):
-                            winner_id = next(p for p in finalists if str(p) != user_id_str)
+                        if (tournament_data['matches']['final']['winner'] is None and
+                                (final_match_id not in match_states or not match_states[final_match_id]['running'])):
+                            winner_id = next(
+                                p for p in finalists if str(p) != user_id_str)
                             tournament_data['matches']['final']['winner'] = winner_id
-                            tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
-                            tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
+                            tournament_data['matches']['final']['player1_score'] = 5 if str(
+                                winner_id) == str(finalists[0]) else 0
+                            tournament_data['matches']['final']['player2_score'] = 5 if str(
+                                winner_id) == str(finalists[1]) else 0
                             tournament_data['status'] = 'finished'
 
                             # Limpiar estado si existe
                             if final_match_id in match_states:
                                 if 'ball_task' in match_states[final_match_id]:
-                                    match_states[final_match_id]['ball_task'].cancel()
+                                    match_states[final_match_id]['ball_task'].cancel(
+                                    )
                                 del match_states[final_match_id]
 
                             # Enviar resultados finales directamente
@@ -492,7 +522,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                                     'results': results
                                 }
                             )
-                            print(f"[DEBUG] Finalista {user_id_str} desconectado antes/durante countdown. Resultados enviados. Ganador: {winner_id}")
+                            print(
+                                f"[DEBUG] Finalista {user_id_str} desconectado antes/durante countdown. Resultados enviados. Ganador: {winner_id}")
                             # Enviar a blockchain en caso de desconexión en final
                             await save_tournament_to_blockchain(tournament_data)
                             await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
@@ -501,16 +532,18 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 # Resto del manejo existente
                 if tournament_data['creator'] == self.user.internal_id and tournament_data['participants']:
                     tournament_data['creator'] = tournament_data['participants'][0]
-                    print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
-                
+                    print(
+                        f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {tournament_data['creator']}")
+
                 if tournament_data['status'] in ['in_progress', 'final', 'finished']:
                     await self.handle_tournament_disconnect(tournament_data)
                 else:
                     await self.send_tournament_info()
-                
+
                 if not tournament_data['participants']:
                     del tournament_rooms[self.tournament_token]
-                    print(f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
+                    print(
+                        f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
             await self.channel_layer.group_discard(self.tournament_token, self.channel_name)
 
     async def handle_tournament_disconnect(self, tournament_data):
@@ -525,35 +558,38 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             if user_id_str in [str(p) for p in players]:
                 match_found = True
                 match_id = f"{self.tournament_token}-{match_key}"
-                match_group_name = f"match_{match_id}"  # Grupo específico del match
-                
+                # Grupo específico del match
+                match_group_name = f"match_{match_id}"
+
                 # Si el match ya tiene ganador, ignorar
                 if match_data['winner']:
-                    print(f"[DEBUG] {match_id} ya tiene ganador: {match_data['winner']}, ignorando desconexión")
+                    print(
+                        f"[DEBUG] {match_id} ya tiene ganador: {match_data['winner']}, ignorando desconexión")
                     continue
 
                 # Determinar oponente
                 opponent_id = next(p for p in players if str(p) != user_id_str)
-                
+
                 # Si la partida está en curso (estado existe en match_states)
                 if match_id in match_states:
                     state = match_states[match_id]
                     state['running'] = False
                     if 'ball_task' in state:
                         state['ball_task'].cancel()
-                    
+
                     # Asegurar que todos los IDs sean strings
                     winner_id = str(opponent_id)
                     state_player1_id = str(state['player1_id'])
                     state_player2_id = str(state['player2_id'])
-                    
+
                     # Asignar victoria al oponente con 5-0
                     state['player1_score'] = 5 if state_player1_id == winner_id else 0
                     state['player2_score'] = 5 if state_player2_id == winner_id else 0
-                    
+
                     winner = 1 if state_player1_id == winner_id else 2
-                    print(f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
-                    
+                    print(
+                        f"[DEBUG] Asignando ganador - Desconectado: {user_id_str}, Winner_id: {winner_id}, Player1_id: {state_player1_id}, Player2_id: {state_player2_id}, Winner: {winner}")
+
                     await self.channel_layer.group_send(
                         match_group_name,
                         {
@@ -577,13 +613,16 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         }
                     )
                     # No eliminamos match_states[match_id] aquí; lo dejamos a TournamentMatchConsumer
-                    
+
                 # Si la partida aún no ha comenzado
                 else:
                     match_data['winner'] = opponent_id
-                    match_data['player1_score'] = 5 if str(opponent_id) == str(players[0]) else 0
-                    match_data['player2_score'] = 5 if str(opponent_id) == str(players[1]) else 0
-                    print(f"[DEBUG] {match_id} marcado como perdido por desconexión. Ganador: {opponent_id}")
+                    match_data['player1_score'] = 5 if str(
+                        opponent_id) == str(players[0]) else 0
+                    match_data['player2_score'] = 5 if str(
+                        opponent_id) == str(players[1]) else 0
+                    print(
+                        f"[DEBUG] {match_id} marcado como perdido por desconexión. Ganador: {opponent_id}")
                     await self.channel_layer.group_send(
                         self.tournament_token,
                         {
@@ -604,7 +643,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         }))
 
         if not match_found:
-            print(f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
+            print(
+                f"[DEBUG] No se encontró match activo para {user_id_str} en {self.tournament_token}")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -614,18 +654,22 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             if self.tournament_token and self.tournament_token in tournament_rooms:
                 old_tournament = tournament_rooms[self.tournament_token]
                 if self.user.internal_id in old_tournament['participants']:
-                    old_tournament['participants'].remove(self.user.internal_id)
-                    print(f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}")
-                    
+                    old_tournament['participants'].remove(
+                        self.user.internal_id)
+                    print(
+                        f"[DEBUG] {self.user.internal_id} ha salido del torneo {self.tournament_token}")
+
                     if old_tournament['creator'] == self.user.internal_id and old_tournament['participants']:
                         old_tournament['creator'] = old_tournament['participants'][0]
-                        print(f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {old_tournament['creator']}")
-                    
+                        print(
+                            f"[DEBUG] Nuevo creador del torneo {self.tournament_token}: {old_tournament['creator']}")
+
                     await self.send_tournament_info()
-                    
+
                     if not old_tournament['participants']:
                         del tournament_rooms[self.tournament_token]
-                        print(f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
+                        print(
+                            f"[DEBUG] Torneo {self.tournament_token} eliminado por falta de participantes")
                 self.tournament_token = None
 
         if action == 'create_tournament':
@@ -643,7 +687,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     'final': {'players': [], 'winner': None, 'player1_score': 0, 'player2_score': 0},
                 }
             }
-            print(f"[DEBUG] Torneo creado por {self.user.internal_id}: {self.tournament_token}")
+            print(
+                f"[DEBUG] Torneo creado por {self.user.internal_id}: {self.tournament_token}")
             await self.channel_layer.group_add(self.tournament_token, self.channel_name)
             await self.send_tournament_info()
 
@@ -664,8 +709,9 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 return
 
             tournament_data = tournament_rooms[tournament_token]
-            print(f"[DEBUG] Intento de unión - User ID: {self.user.internal_id}, Tournament: {tournament_token}, Current Participants: {tournament_data['participants']}")
-            
+            print(
+                f"[DEBUG] Intento de unión - User ID: {self.user.internal_id}, Tournament: {tournament_token}, Current Participants: {tournament_data['participants']}")
+
             if tournament_data['status'] != 'waiting':
                 await self.send(text_data=json.dumps({
                     'type': 'error',
@@ -681,7 +727,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 return
 
             if self.user.internal_id in tournament_data['participants']:
-                print(f"[DEBUG] Error: Usuario {self.user.internal_id} ya está en participants: {tournament_data['participants']}")
+                print(
+                    f"[DEBUG] Error: Usuario {self.user.internal_id} ya está en participants: {tournament_data['participants']}")
                 await self.send(text_data=json.dumps({
                     'type': 'error',
                     'message': 'Ya estás en este torneo'
@@ -693,7 +740,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             tournament_data['participants'].append(self.user.internal_id)
             self.tournament_token = tournament_token
             await self.channel_layer.group_add(tournament_token, self.channel_name)
-            print(f"[DEBUG] {self.user.internal_id} se unió al torneo {tournament_token}, New Participants: {tournament_data['participants']}")
+            print(
+                f"[DEBUG] {self.user.internal_id} se unió al torneo {tournament_token}, New Participants: {tournament_data['participants']}")
             await self.send_tournament_info()
 
         elif action == 'start_tournament':
@@ -727,10 +775,12 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 }))
                 return
 
-            print(f"[DEBUG] Iniciando torneo {tournament_token} por {self.user.internal_id}")
+            print(
+                f"[DEBUG] Iniciando torneo {tournament_token} por {self.user.internal_id}")
             tournament_data['status'] = 'in_progress'
 
-            participants = tournament_data['participants']  # Lista de IDs: [1, 2, 3, 4]
+            # Lista de IDs: [1, 2, 3, 4]
+            participants = tournament_data['participants']
             match1_players = participants[:2]  # [1, 2]
             match2_players = participants[2:]  # [3, 4]
 
@@ -762,14 +812,16 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         'user_id': player_id
                     }))
 
-            print(f"[DEBUG] Matches iniciados: {match1_id} ({match1_players}), {match2_id} ({match2_players})")
+            print(
+                f"[DEBUG] Matches iniciados: {match1_id} ({match1_players}), {match2_id} ({match2_players})")
             await self.send_tournament_info()
 
     async def send_tournament_info(self):
         if self.tournament_token and self.tournament_token in tournament_rooms:
             tournament_data = tournament_rooms[self.tournament_token]
             participants_info = await self.get_participants_info(tournament_data['participants'])
-            print(f"[DEBUG] Enviando actualización al grupo - Token: {self.tournament_token}, Creator ID: {tournament_data['creator']}")
+            print(
+                f"[DEBUG] Enviando actualización al grupo - Token: {self.tournament_token}, Creator ID: {tournament_data['creator']}")
             await self.channel_layer.group_send(
                 self.tournament_token,
                 {
@@ -807,7 +859,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
     async def tournament_info(self, event):
         show_start_button = (self.user.internal_id == event['creator'])
-        print(f"[DEBUG] Enviando a frontend - User ID: {self.user.internal_id}, Creator ID: {event['creator']}, Show Start Button: {show_start_button}")
+        print(
+            f"[DEBUG] Enviando a frontend - User ID: {self.user.internal_id}, Creator ID: {event['creator']}, Show Start Button: {show_start_button}")
         await self.send(text_data=json.dumps({
             'type': 'tournament_info',
             'token': event['token'],
@@ -831,7 +884,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     tournament_data['matches'][match_key]['winner'] = winner_id
                     tournament_data['matches'][match_key]['player1_score'] = player1_score
                     tournament_data['matches'][match_key]['player2_score'] = player2_score
-                    print(f"[DEBUG] Ganador de {match_id}: {winner_id}, Puntuación: {player1_score}-{player2_score}")
+                    print(
+                        f"[DEBUG] Ganador de {match_id}: {winner_id}, Puntuación: {player1_score}-{player2_score}")
 
                 if match_key == 'final' and tournament_data['status'] != 'finished':
                     tournament_data['status'] = 'finished'
@@ -860,17 +914,19 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                             'results': results
                         }
                     )
-                    print(f"[DEBUG] Torneo {self.tournament_token} finalizado. Resultados enviados.")
+                    print(
+                        f"[DEBUG] Torneo {self.tournament_token} finalizado. Resultados enviados.")
 
                     # Enviar los resultados a la blockchain
                     await save_tournament_to_blockchain(tournament_data)
 
-                elif (tournament_data['matches']['match1']['winner'] is not None and 
-                      tournament_data['matches']['match2']['winner'] is not None and 
+                elif (tournament_data['matches']['match1']['winner'] is not None and
+                      tournament_data['matches']['match2']['winner'] is not None and
                       tournament_data['status'] == 'in_progress'):
                     await self.start_final(tournament_data)
             else:
-                print(f"[DEBUG] Match {match_id} no encontrado en torneo {self.tournament_token}")
+                print(
+                    f"[DEBUG] Match {match_id} no encontrado en torneo {self.tournament_token}")
 
     async def start_final(self, tournament_data):
         tournament_data['status'] = 'final'
@@ -884,14 +940,18 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         await asyncio.sleep(3)
 
         # Verificar conexiones antes del countdown
-        missing_players = [p for p in finalists if p not in tournament_connections]
+        missing_players = [
+            p for p in finalists if p not in tournament_connections]
         if missing_players:
-            print(f"[DEBUG] Jugadores desconectados antes del countdown: {missing_players}")
+            print(
+                f"[DEBUG] Jugadores desconectados antes del countdown: {missing_players}")
             if len(missing_players) == 1:
                 winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
                 tournament_data['matches']['final']['winner'] = winner_id
-                tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
-                tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
+                tournament_data['matches']['final']['player1_score'] = 5 if str(
+                    winner_id) == str(finalists[0]) else 0
+                tournament_data['matches']['final']['player2_score'] = 5 if str(
+                    winner_id) == str(finalists[1]) else 0
                 tournament_data['status'] = 'finished'
                 # Enviar resultados directamente
                 results = {
@@ -916,12 +976,14 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         'results': results
                     }
                 )
-                print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión antes del countdown. Resultados enviados.")
+                print(
+                    f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión antes del countdown. Resultados enviados.")
                 # Enviar a blockchain
                 await save_tournament_to_blockchain(tournament_data)
                 return
             elif len(missing_players) == 2:
-                print(f"[DEBUG] Ambos finalistas desconectados, torneo {self.tournament_token} cancelado")
+                print(
+                    f"[DEBUG] Ambos finalistas desconectados, torneo {self.tournament_token} cancelado")
                 tournament_data['status'] = 'finished'
                 return
 
@@ -949,11 +1011,14 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         }))
                     )
             if len(tasks) < 2:
-                missing_players = [p for p in finalists if p not in tournament_connections]
+                missing_players = [
+                    p for p in finalists if p not in tournament_connections]
                 winner_id = finalists[0] if missing_players[0] == finalists[1] else finalists[1]
                 tournament_data['matches']['final']['winner'] = winner_id
-                tournament_data['matches']['final']['player1_score'] = 5 if str(winner_id) == str(finalists[0]) else 0
-                tournament_data['matches']['final']['player2_score'] = 5 if str(winner_id) == str(finalists[1]) else 0
+                tournament_data['matches']['final']['player1_score'] = 5 if str(
+                    winner_id) == str(finalists[0]) else 0
+                tournament_data['matches']['final']['player2_score'] = 5 if str(
+                    winner_id) == str(finalists[1]) else 0
                 tournament_data['status'] = 'finished'
                 results = {
                     'participants': await self.get_participants_info(tournament_data['participants']),
@@ -977,7 +1042,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                         'results': results
                     }
                 )
-                print(f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión durante countdown. Resultados enviados.")
+                print(
+                    f"[DEBUG] Torneo {self.tournament_token} finalizado por desconexión durante countdown. Resultados enviados.")
                 # Enviar a blockchain
                 await save_tournament_to_blockchain(tournament_data)
                 return
@@ -992,7 +1058,8 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     'opponent_id': finalists[0] if player_id == finalists[1] else finalists[1],
                     'user_id': player_id
                 }))
-                print(f"[DEBUG] Enviado start_tournament a {player_id} para {final_match_id}")
+                print(
+                    f"[DEBUG] Enviado start_tournament a {player_id} para {final_match_id}")
 
         print(f"[DEBUG] Final iniciada: {final_match_id} ({finalists})")
 
@@ -1029,12 +1096,13 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 'total_points': 0
             }
 
+
 class TournamentMatchConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.match_id = self.scope['url_route']['kwargs']['match_id']
         self.tournament_token = self.match_id.split('-')[0]
         self.room_group_name = f'match_{self.match_id}'
-        
+
         session = self.scope.get('session', {})
         self.user_id = session.get('user_id')
         if not self.user_id:
@@ -1045,10 +1113,12 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
         # Verificar autorización
         tournament_data = tournament_rooms.get(self.tournament_token, {})
         match_key = self.match_id.split('-')[-1]
-        expected_players = tournament_data.get('matches', {}).get(match_key, {}).get('players', [])
+        expected_players = tournament_data.get(
+            'matches', {}).get(match_key, {}).get('players', [])
         user_id_str = str(self.user_id)
         if user_id_str not in [str(p) for p in expected_players]:
-            print(f"[DEBUG] {user_id_str} no autorizado para {self.match_id}. Expected: {expected_players}")
+            print(
+                f"[DEBUG] {user_id_str} no autorizado para {self.match_id}. Expected: {expected_players}")
             await self.close(code=4003)
             return
 
@@ -1080,17 +1150,17 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             if user_id_str in state['players']:
                 del state['players'][user_id_str]
                 state['ready'] -= 1
-                
+
                 if state['running']:
                     # Partida en curso: dar victoria al oponente con 5-0
                     state['running'] = False
                     if 'ball_task' in state:
                         state['ball_task'].cancel()
-                    
+
                     winner_id = state['player1_id'] if user_id_str == state['player2_id'] else state['player2_id']
                     state['player1_score'] = 5 if state['player1_id'] == winner_id else 0
                     state['player2_score'] = 5 if state['player2_id'] == winner_id else 0
-                    
+
                     await self.channel_layer.group_send(
                         self.room_group_name,
                         {
@@ -1114,10 +1184,12 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                         }
                     )
                     del match_states[self.match_id]
-                    print(f"[DEBUG] {self.match_id} terminado por desconexión. Ganador: {winner_id}")
+                    print(
+                        f"[DEBUG] {self.match_id} terminado por desconexión. Ganador: {winner_id}")
                 elif state['ready'] == 0:
                     del match_states[self.match_id]
-                    print(f"[DEBUG] Estado de {self.match_id} eliminado por desconexión total")
+                    print(
+                        f"[DEBUG] Estado de {self.match_id} eliminado por desconexión total")
 
     async def receive(self, text_data):
         data = json.loads(text_data)
@@ -1134,7 +1206,8 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                 player_number = 1 if user_id_str == state['player1_id'] else 2
                 state['players'][user_id_str] = player_number
                 state['ready'] += 1
-                print(f"[DEBUG] {self.user_id} se unió como player{player_number}, Ready: {state['ready']}")
+                print(
+                    f"[DEBUG] {self.user_id} se unió como player{player_number}, Ready: {state['ready']}")
 
                 if state['ready'] == 2 and not state['running']:
                     state['running'] = True
@@ -1157,14 +1230,15 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
             paddle_step = 0.025  # Misma velocidad que el frontend
             is_player1 = user_id_str == state['player1_id']
             paddle_key = 'left_paddle' if is_player1 else 'right_paddle'
-            
+
             if direction == 'up':
                 state[paddle_key] = max(0, state[paddle_key] - paddle_step)
             elif direction == 'down':
                 state[paddle_key] = min(1, state[paddle_key] + paddle_step)
-            
-            print(f"[DEBUG] Moviendo {paddle_key} de {user_id_str} a {state[paddle_key]}")
-            
+
+            print(
+                f"[DEBUG] Moviendo {paddle_key} de {user_id_str} a {state[paddle_key]}")
+
             # Enviar actualización de ambas paletas a todos los clientes
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -1201,19 +1275,21 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                 # Colisión con la paleta izquierda (player1)
                 if (state['ball_x'] <= 0.03 and state['ball_x'] >= -0.01 and
                     state['ball_y'] >= state['left_paddle'] - paddle_height/2 and
-                    state['ball_y'] <= state['left_paddle'] + paddle_height/2):
+                        state['ball_y'] <= state['left_paddle'] + paddle_height/2):
                     state['ball_dx'] = -state['ball_dx'] * 1.1
                     state['ball_x'] = 0.03
-                    relative_intersection = (state['ball_y'] - state['left_paddle']) / (paddle_height/2)
+                    relative_intersection = (
+                        state['ball_y'] - state['left_paddle']) / (paddle_height/2)
                     state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
                 # Colisión con la paleta derecha (player2)
                 if (state['ball_x'] >= 0.97 and state['ball_x'] <= 1.01 and
                     state['ball_y'] >= state['right_paddle'] - paddle_height/2 and
-                    state['ball_y'] <= state['right_paddle'] + paddle_height/2):
+                        state['ball_y'] <= state['right_paddle'] + paddle_height/2):
                     state['ball_dx'] = -state['ball_dx'] * 1.1
                     state['ball_x'] = 0.97
-                    relative_intersection = (state['ball_y'] - state['right_paddle']) / (paddle_height/2)
+                    relative_intersection = (
+                        state['ball_y'] - state['right_paddle']) / (paddle_height/2)
                     state['ball_dy'] = base_speed * 1.5 * relative_intersection
 
                 # Punto para player2 si la bola pasa por la izquierda
@@ -1221,7 +1297,8 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     state['player2_score'] += 1
                     await self.channel_layer.group_send(
                         self.room_group_name,
-                        {'type': 'update_score', 'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
+                        {'type': 'update_score',
+                            'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
                     )
                     self.reset_ball(state, base_speed)
                     await asyncio.sleep(1)
@@ -1231,7 +1308,8 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                     state['player1_score'] += 1
                     await self.channel_layer.group_send(
                         self.room_group_name,
-                        {'type': 'update_score', 'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
+                        {'type': 'update_score',
+                            'player1_score': state['player1_score'], 'player2_score': state['player2_score']}
                     )
                     self.reset_ball(state, base_speed)
                     await asyncio.sleep(1)
@@ -1268,7 +1346,8 @@ class TournamentMatchConsumer(AsyncWebsocketConsumer):
                 # Enviar actualización de la bola a los clientes
                 await self.channel_layer.group_send(
                     self.room_group_name,
-                    {'type': 'update_ball', 'ball_position_x': state['ball_x'], 'ball_position_y': state['ball_y']}
+                    {'type': 'update_ball',
+                        'ball_position_x': state['ball_x'], 'ball_position_y': state['ball_y']}
                 )
                 await asyncio.sleep(update_interval)
 
