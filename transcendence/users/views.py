@@ -47,11 +47,19 @@ def update_profile(request):
         new_internal_login = request.POST.get('internal_login')
         # Obtener el valor y eliminar espacios
         new_internal_picture = request.POST.get('internal_picture', '').strip()
+        # Validar que el nombre tiene de 3 a 12 caracteres
+        if new_internal_login and (len(new_internal_login) < 3 or len(new_internal_login) > 12):
+            return JsonResponse({'status': 'error', 'message': 'El nombre de usuario debe tener entre 3 y 12 caracteres'}, status=400)
+        # Validar que el nombre solo contiene letras y números y simbolos permitidos
+        if new_internal_login and not all(c.isalnum() or c in ['-', '_'] for c in new_internal_login):
+            return JsonResponse({'status': 'error', 'message': 'El nombre de usuario solo puede contener letras, números, guiones y guiones bajos'}, status=400)
 
         # Validar y actualizar el nombre de usuario
         if new_internal_login and new_internal_login != user.internal_login:
-            if User.objects.filter(internal_login=new_internal_login).exists():
-                return JsonResponse({'status': 'error', 'message': 'Este nombre de usuario ya está en uso'}, status=400)
+            # Verificar si el nuevo internal_login ya existe como internal_login o como intra_login de OTRO usuario
+            if User.objects.filter(internal_login=new_internal_login).exists() or \
+               User.objects.exclude(internal_id=user.internal_id).filter(intra_login=new_internal_login).exists():
+                return JsonResponse({'status': 'error', 'message': 'Este nombre ya está en uso (como nombre personalizado o de cuenta)'}, status=400)
             user.internal_login = new_internal_login
             request.session['intra_login'] = new_internal_login
 

@@ -53,12 +53,20 @@
                         <tr>
                             <th scope="row">{{ forloop.counter }}</th>
                             <td>
-                                <img src="{{ player.intra_picture|default:'/static/default-avatar.png' }}" 
+                                <img src="{% if player.internal_picture %}{{ player.internal_picture }}{% else %}{{ player.intra_picture|default:'/static/default-avatar.png' }}{% endif %}" 
                                      alt="{{ player.intra_login }}" 
                                      class="rounded-circle" 
                                      style="width: 50px; height: 50px; object-fit: cover;">
                             </td>
-                            <td>{{ player.intra_login }}</td>
+                            <td>
+                                {% if player.intra_login == "ANONYMOUS" %}
+                                    {{ player.intra_login }}
+                                {% elif player.internal_login %}
+                                    {{ player.internal_login }}
+                                {% else %}
+                                    {{ player.intra_login }}
+                                {% endif %}
+                            </td>
                             <td>{{ player.games_played }}</td>
                             <td>{{ player.games_won }}</td>
                             <td>{{ player.total_points }}</td>
