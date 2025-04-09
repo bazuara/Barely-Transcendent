@@ -4,7 +4,7 @@ from django.conf import settings
 from django.http import HttpResponse, HttpResponseServerError, JsonResponse
 from .models import User
 from django.utils import timezone
-from django.contrib.auth import login as auth_login # para el fake login
+from django.contrib.auth import login as auth_login  # para el fake login
 
 
 # oauth_url = (
@@ -35,6 +35,7 @@ def update_profile(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return JsonResponse({'status': 'error', 'message': 'No estás autenticado'}, status=401)
+
     # Obtener el usuario
     try:
         user = User.objects.get(internal_id=user_id)
@@ -44,19 +45,46 @@ def update_profile(request):
     # Actualizar datos si es una solicitud POST
     if request.method == 'POST':
         new_internal_login = request.POST.get('internal_login')
+        # Obtener el valor y eliminar espacios
+        new_internal_picture = request.POST.get('internal_picture', '').strip()
+        # Validar que el nombre tiene de 3 a 12 caracteres
+        if new_internal_login and (len(new_internal_login) < 3 or len(new_internal_login) > 12):
+            return JsonResponse({'status': 'error', 'message': 'El nombre de usuario debe tener entre 3 y 12 caracteres'}, status=400)
+        # Validar que el nombre solo contiene letras y números y simbolos permitidos
+        if new_internal_login and not all(c.isalnum() or c in ['-', '_'] for c in new_internal_login):
+            return JsonResponse({'status': 'error', 'message': 'El nombre de usuario solo puede contener letras, números, guiones y guiones bajos'}, status=400)
 
-        # Validar que el nuevo login no esté ya usado por otro usuario
+        # Validar y actualizar el nombre de usuario
         if new_internal_login and new_internal_login != user.internal_login:
-            if User.objects.filter(internal_login=new_internal_login).exists():
-                return JsonResponse({'status': 'error', 'message': 'Este nombre de usuario ya está en uso'}, status=400)
+            # Verificar si el nuevo internal_login ya existe como internal_login o como intra_login de OTRO usuario
+            if User.objects.filter(internal_login=new_internal_login).exists() or \
+               User.objects.exclude(internal_id=user.internal_id).filter(intra_login=new_internal_login).exists():
+                return JsonResponse({'status': 'error', 'message': 'Este nombre ya está en uso (como nombre personalizado o de cuenta)'}, status=400)
             user.internal_login = new_internal_login
-            # Actualizar sesión
             request.session['intra_login'] = new_internal_login
 
-        # Manejar la carga de una nueva imagen (implementar después si se necesita)
-        # if 'internal_picture' in request.FILES:
-        #     # Lógica para manejar la imagen
+        # Manejar la imagen personalizada
+        # Comparar con el valor actual (None se convierte en '')
+        if new_internal_picture != (user.internal_picture or ''):
+            if new_internal_picture:  # Si se proporcionó un enlace
+                # Lista de extensiones permitidas
+                allowed_extensions = ('.png', '.jpg', '.jpeg')
+                if not new_internal_picture.lower().endswith(allowed_extensions):
+                    return JsonResponse({'status': 'error', 'message': 'El enlace debe ser a una imagen PNG, JPG o JPEG'}, status=400)
 
+                # Verificar si el enlace es accesible (opcional)
+                try:
+                    response = requests.head(new_internal_picture, timeout=5)
+                    if response.status_code != 200 or 'image' not in response.headers.get('Content-Type', ''):
+                        return JsonResponse({'status': 'error', 'message': 'El enlace no apunta a una imagen válida'}, status=400)
+                except requests.RequestException:
+                    return JsonResponse({'status': 'error', 'message': 'No se pudo verificar el enlace de la imagen'}, status=400)
+
+                user.internal_picture = new_internal_picture
+            else:  # Si el campo está vacío, establecer internal_picture como None
+                user.internal_picture = None
+
+        # Guardar los cambios en la base de datos
         user.save()
 
         if request.htmx:
@@ -171,10 +199,11 @@ def mock_login(request, username):
 
     if user:
         # Guarda el ID del usuario en la sesión
-        request.session['user_id'] = user.internal_id  
+        request.session['user_id'] = user.internal_id
         return JsonResponse({"status": "success", "message": f"Mock login successful for {username}"})
     else:
         return JsonResponse({"status": "error", "message": "User not found"}, status=400)
+
 
 def anonimize(request):
     # Obtener el ID del usuario de la sesión

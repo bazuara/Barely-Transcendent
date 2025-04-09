@@ -27,12 +27,12 @@ class User(models.Model):
     def anonimize(self):
         self.intra_id = 0
         self.intra_picture = "/static/default-avatar.png"
-        self.intra_login = "ANOYMOUS"
+        self.intra_login = "ANONYMOUS"
         self.intra_name = "ANONYMOUS"
         self.intra_surname = "ANONYMOUS"
         # set internal login to ANONYMOUS + timestamp
         self.internal_login = "ANONYMOUS_" + str(timezone.now())
-        self.internal_picture = "ANONYMOUS"
+        self.internal_picture = "/static/default-avatar.png"
         self.user_creation = timezone.now()
         self.last_online = timezone.now()
         # log to console user is anonimized
