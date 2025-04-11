@@ -1,0 +1,113 @@
+services:
+  django:
+    build: 
+      context: .
+      dockerfile: django.Dockerfile
+    volumes:
+      - ./blockchain/build:/app/build
+    networks:
+      - barely_a_network
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      ganache:
+        condition: service_healthy
+    
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:latest
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - barely_a_network
+    env_file:
+      - .env
+
+  redis:
+    image: redis:latest
+    env_file:
+      - .env
+    command: >
+          --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    restart: unless-stopped
+    networks:
+      - barely_a_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - barely_a_network
+    depends_on:
+      - django
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    networks:
+      - barely_a_network
+    depends_on:
+      - prometheus
+
+  ganache:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile.ganache
+    container_name: ganache
+    command: ganache-cli -h 0.0.0.0 -p 8545 -i 5777
+    ports:
+      - "8545:8545"
+    networks:
+      - barely_a_network
+    healthcheck:
+      test: ["CMD", "curl", "-s", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+      start_interval: 5s
+    restart: always
+
+  truffle:
+    build:
+      context: ./blockchain
+      dockerfile: Dockerfile.truffle
+    container_name: truffle
+    command: truffle migrate --network development
+    volumes:
+      - ./blockchain/build:/app/build
+    depends_on:
+      ganache:
+        condition: service_healthy
+    networks:
+      - barely_a_network
+    working_dir: /app
+    restart: on-failure
+    environment:
+      - HOST=ganache
+      - PORT=8545
+      - NETWORK_ID=5777
+
+networks:
+  barely_a_network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  grafana-data:
