@@ -21,7 +21,7 @@ services:
       - "8000:8000"
 
   db:
-    image: postgres:latest
+    image: postgres:17.4
     restart: unless-stopped
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -31,7 +31,7 @@ services:
       - .env
 
   redis:
-    image: redis:latest
+    image: redis:7.4.2
     env_file:
       - .env
     command: >
@@ -41,7 +41,7 @@ services:
       - barely_a_network
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.4
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -52,7 +52,7 @@ services:
       - django
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.6.0
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
@@ -99,10 +99,12 @@ services:
       - barely_a_network
     working_dir: /app
     restart: on-failure
+    env_file:
+      - .env
     environment:
-      - HOST=ganache
-      - PORT=8545
-      - NETWORK_ID=5777
+      - HOST=${TRUFFLE_HOST}
+      - PORT=${TRUFFLE_PORT}
+      - NETWORK_ID=${TRUFFLE_NETWORK_ID}
 
 networks:
   barely_a_network:
