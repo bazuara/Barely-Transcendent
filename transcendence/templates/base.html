@@ -17,11 +17,11 @@
         <script src="{% static 'js/htmx.min.js' %}" defer></script>
         {% block extra_head %}{% endblock %}
     </head>
-    <body>
+    <body class="d-flex flex-column min-vh-100">
         <!-- Cargar el Header desde un partial -->
         <div id="header-container">{% include "partials/header.html" %}</div>
         <!-- Contenido dinámico -->
-        <main id="content" class="container my-4">
+        <main id="content" class="container my-4 flex-fill">
             {% block content %}
             {% endblock content %}
         </main>
