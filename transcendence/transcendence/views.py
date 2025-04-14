@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
 from users.models import User
 from django.utils import timezone
+import time
+
 
 def home(request):
     # Obtener el ID del usuario de la sesión
@@ -23,19 +25,22 @@ def home(request):
     # Obtener el Top 10 de jugadores por games_won
     top_players = User.objects.order_by('-games_won')[:10]
 
-    # Preparar el contexto con el usuario y el ranking
+    # Preparar el contexto con el usuario, el ranking y un timestamp para evitar caché
     context = {
         'user': user,
         'top_players': top_players,
+        'cache_bust': int(time.time())
     }
 
     template = "partials/home.html" if request.htmx else "home.html"
 
     return render(request, template, context)
 
+
 def about(request):
     template = "partials/about.html" if request.htmx else "about.html"
     return render(request, template)
+
 
 def pong(request):
     # Verificar si el usuario está autenticado
@@ -45,6 +50,7 @@ def pong(request):
     
     template = "partials/pong.html" if request.htmx else "pong.html"
     return render(request, template)
+
 
 def tournament(request):
     # Verificar si el usuario está autenticado

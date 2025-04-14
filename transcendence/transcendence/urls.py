@@ -1,22 +1,8 @@
-"""
-URL configuration for transcendence project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
 from transcendence import views
+from django.conf import settings
+from django.conf.urls.static import static
 from users.views import login, oauth_callback, logout, profile, update_profile, mock_login, anonimize
 
 
@@ -26,12 +12,12 @@ urlpatterns = [
     path('oauth/callback', oauth_callback, name='oauth_callback'),
     path('home/', views.home, name='home'),
     path('about/', views.about, name='about'),
-    path('logout/', logout, name='logout'),  # Añadir ruta para cerrar sesión
-    path('profile/', profile, name='profile'),  # Añadir ruta para ver perfil
-    path('profile/update/', update_profile, name='update_profile'),  # Añadir ruta para actualizar perfil
+    path('logout/', logout, name='logout'),
+    path('profile/', profile, name='profile'),
+    path('profile/update/', update_profile, name='update_profile'),
     path('pong/', views.pong, name='pong'),
     path('tournament/', views.tournament, name='tournament'),
     path('mock-login/<str:username>/', mock_login, name='mock_login'),
     path('profile/anonimize/', anonimize, name='anonimize'),
     path("prometheus/", include("django_prometheus.urls")),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

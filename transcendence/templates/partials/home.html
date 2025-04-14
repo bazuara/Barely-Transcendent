@@ -21,6 +21,7 @@
                 </div>
             </div>
         </div>
+    </div>
     
     <div class="row mt-4">
         <div class="col-12">
@@ -42,10 +43,11 @@
                         <tr>
                             <th scope="row">{{ forloop.counter }}</th>
                             <td>
-                                <img src="{% if player.internal_picture %}{{ player.internal_picture }}{% else %}{{ player.intra_picture|default:'/static/default-avatar.png' }}{% endif %}" 
+                                <img src="{% if player.internal_picture %}{{ player.internal_picture.url }}?v={{ cache_bust }}{% else %}{{ player.intra_picture|default:'/static/default-avatar.png' }}{% endif %}" 
                                      alt="{{ player.intra_login }}" 
-                                     class="rounded-circle" 
-                                     style="width: 50px; height: 50px; object-fit: cover;">
+                                     class="rounded-circle player-picture" 
+                                     style="width: 50px; height: 50px; object-fit: cover;"
+                                     data-player-id="{{ player.intra_id }}">
                             </td>
                             <td>
                                 {% if player.intra_login == "ANONYMOUS" %}
@@ -71,3 +73,20 @@
         </div>
     </div>
 </div>
+<script>
+    // Escuchar eventos HTMX para actualizar imágenes tras cambios en el perfil
+    document.addEventListener('htmx:afterSwap', function(event) {
+        // Verificar si la respuesta viene de update_profile
+        if (event.detail.xhr.responseURL.includes('update_profile')) {
+            // Obtener el intra_id del usuario actual
+            const currentUserId = '{{ user.intra_id }}';
+            // Actualizar todas las imágenes de este usuario en el ranking
+            document.querySelectorAll(`.player-picture[data-player-id="${currentUserId}"]`).forEach(img => {
+                // Forzar recarga con un nuevo timestamp
+                const timestamp = new Date().getTime();
+                const baseUrl = img.src.split('?')[0];
+                img.src = baseUrl + '?v=' + timestamp;
+            });
+        }
+    });
+</script>
