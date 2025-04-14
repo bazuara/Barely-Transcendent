@@ -18,16 +18,16 @@
                     <div class="row mb-4">
                         <div class="col-md-4 text-center">
                             {% if user.internal_picture %}
-                                <img src="{{ user.internal_picture }}"
+                                <img src="{{ user.internal_picture.url }}?v={{ cache_bust }}"
                                      alt="{{ user.internal_login }}"
-                                     class="img-thumbnail mb-3"
+                                     class="img-thumbnail mb-3 profile-picture"
                                      style="width: 150px;
                                             height: 150px;
                                             object-fit: cover">
                             {% elif user.intra_picture %}
                                 <img src="{{ user.intra_picture }}"
                                      alt="{{ user.internal_login }}"
-                                     class="img-thumbnail mb-3"
+                                     class="img-thumbnail mb-3 profile-picture"
                                      style="width: 150px;
                                             height: 150px;
                                             object-fit: cover">
@@ -70,7 +70,8 @@
                     </div>
                     <form hx-post="{% url 'update_profile' %}"
                           hx-target="#content"
-                          class="mt-4">
+                          class="mt-4"
+                          enctype="multipart/form-data">
                         {% csrf_token %}
                         <h4>Información Personalizada</h4>
                         <div class="mb-3">
@@ -83,17 +84,15 @@
                                    required>
                             <div class="form-text">Este es el nombre que se mostrará a otros usuarios.</div>
                         </div>
-                        <!-- Campo para el enlace de la imagen personalizada -->
                         <div class="mb-3">
-                            <label for="internal_picture" class="form-label">Enlace de la imagen de perfil</label>
-                            <input type="url"
+                            <label for="internal_picture" class="form-label">Imagen de perfil</label>
+                            <input type="file"
                                    class="form-control"
                                    id="internal_picture"
                                    name="internal_picture"
-                                   value="{{ user.internal_picture|default:'' }}"
-                                   placeholder="Deja vacío para usar la imagen por defecto">
+                                   accept="image/png">
                             <div class="form-text">
-                                Ingresa un enlace a una imagen (PNG, JPG o JPEG). Si lo dejas vacío, se usará tu imagen por defecto.
+                                Sube una imagen PNG para tu perfil. Deja vacío para usar la imagen por defecto.
                             </div>
                         </div>
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -106,7 +105,6 @@
                             <button type="submit" class="btn btn-primary">Guardar cambios</button>
                         </div>
                     </form>
-                    <!-- Modal de confirmación -->
                     <div class="modal fade"
                          id="anonimizeModal"
                          tabindex="-1"
@@ -129,7 +127,7 @@
                                         De acuerdo con el <strong>RGPD</strong>, tus datos identificativos como tu nombre o sus derivados (login, etc.) serán <strong>anonimizados</strong>, así como tu imagen de perfil.
                                     </p>
                                     <p>
-                                        Tu imagen de perfil <em>nunca ha sido almacenada</em>, pero se reemplazará su URL por una genérica.
+                                        Tu imagen de perfil será <strong>eliminada permanentemente</strong> del servidor.
                                     </p>
                                     <p>
                                         El resto de datos generados mediante la interacción con este sitio <strong>permanecerán visibles</strong>, al igual que los torneos en blockchain, pero <strong>ningún dato identificativo relacionado contigo será conservado</strong>.
@@ -140,7 +138,6 @@
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                    <!-- Formulario oculto que hace POST a la vista -->
                                     <form id="anonimizeForm" method="POST" action="{% url 'anonimize' %}">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-danger">Sí, eliminar cuenta</button>
@@ -159,4 +156,18 @@
         const modal = new bootstrap.Modal(document.getElementById('anonimizeModal'));
         modal.show();
     }
+
+    // Escuchar el evento HTMX después de que se procese la respuesta
+    document.addEventListener('htmx:afterSwap', function(event) {
+        // Verificar si la respuesta viene de update_profile
+        if (event.detail.xhr.responseURL.includes('update_profile')) {
+            // Forzar la recarga de la imagen
+            const img = document.querySelector('.profile-picture');
+            if (img && img.src) {
+                // Añadir un parámetro único para evitar caché
+                const timestamp = new Date().getTime();
+                img.src = img.src.split('?')[0] + '?v=' + timestamp;
+            }
+        }
+    });
 </script>

@@ -1,5 +1,12 @@
 from django.db import models
 from django.utils import timezone
+import os
+
+
+def user_profile_picture_path(instance, filename):
+    # Guardar la imagen como <intra_id>.png
+    ext = 'png'  # Forzamos la extensión a PNG
+    return os.path.join('profile_pictures', f'{instance.intra_id}.{ext}')
 
 
 class User(models.Model):
@@ -11,7 +18,8 @@ class User(models.Model):
     intra_surname = models.CharField(max_length=100)
     internal_login = models.CharField(
         max_length=100, unique=True, blank=True, null=True)
-    internal_picture = models.URLField(max_length=255, blank=True, null=True)
+    internal_picture = models.ImageField(
+        upload_to=user_profile_picture_path, blank=True, null=True)
     user_creation = models.DateTimeField(auto_now_add=True)
     last_online = models.DateTimeField(default=timezone.now)
 
@@ -23,18 +31,20 @@ class User(models.Model):
     def __str__(self):
         return str(self.intra_id)
 
-   # anonimize user
     def anonimize(self):
+        # Eliminar la imagen física si existe
+        if self.internal_picture:
+            if os.path.isfile(self.internal_picture.path):
+                os.remove(self.internal_picture.path)
+            self.internal_picture = None
+
         self.intra_id = 0
         self.intra_picture = "/static/default-avatar.png"
         self.intra_login = "ANONYMOUS"
         self.intra_name = "ANONYMOUS"
         self.intra_surname = "ANONYMOUS"
-        # set internal login to ANONYMOUS + timestamp
         self.internal_login = "ANONYMOUS_" + str(timezone.now())
-        self.internal_picture = "/static/default-avatar.png"
         self.user_creation = timezone.now()
         self.last_online = timezone.now()
-        # log to console user is anonimized
         print(f"User {self.internal_id} is now anonimized")
         self.save()
