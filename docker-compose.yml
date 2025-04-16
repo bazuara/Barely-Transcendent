@@ -18,9 +18,6 @@ services:
       ganache:
         condition: service_healthy
     
-    ports:
-      - "8000:8000"
-
   db:
     image: postgres:17.4
     restart: unless-stopped
@@ -45,12 +42,17 @@ services:
     image: prom/prometheus:v2.53.4
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
     networks:
       - barely_a_network
     depends_on:
       - django
+    env_file:
+      - .env
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.external-url=${CAMPUS_HOST}/prometheus/"
+      - "--web.route-prefix=/"
+
 
   grafana:
     image: grafana/grafana:11.6.0
@@ -59,8 +61,6 @@ services:
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/dashboards:/var/lib/grafana/dashboards
-    ports:
-      - "3000:3000"
     networks:
       - barely_a_network
     env_file:
