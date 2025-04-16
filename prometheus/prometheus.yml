@@ -2,7 +2,11 @@ global:
   scrape_interval: 15s  # Intervalo de scraping (cada 15 segundos)
 
 scrape_configs:
-  - job_name: "django"
+  - job_name: "django_devcontainer"
     metrics_path: "/prometheus/metrics"
     static_configs:
       - targets: ["devcontainer:8000"]  # Conectar a Django dentro del mismo network de Docker
+  - job_name: "django_prod"
+    metrics_path: "/prometheus/metrics"
+    static_configs:
+      - targets: ["django:8000"]  # Conectar a Django dentro del mismo network de Docker

@@ -3,6 +3,7 @@ services:
     build: 
       context: .
       dockerfile: django.Dockerfile
+    container_name: django
     volumes:
       - ./blockchain/build:/app/build
     networks:
