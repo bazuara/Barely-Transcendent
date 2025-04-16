@@ -1,100 +1,139 @@
-<div>
-    <h2 class="text-2xl font-bold">Acerca de</h2>
-    <p>Esta es una aplicación de prueba con Django y htmx.</p>
+<div class="about-container">
+    <h1 class="mb-4 text-center">Acerca de Nuestro Equipo</h1>
+
+    <div class="row mb-5">
+        <div class="col-12">
+            <p class="lead text-center">
+                Somos un equipo de estudiantes de <strong>42 Madrid</strong>, comprometidos con la innovación tecnológica y el aprendizaje colaborativo. Este proyecto, desarrollado como parte del <em>Common Core</em>, refleja nuestro esfuerzo conjunto para crear una solución robusta y funcional, combinando creatividad y rigor técnico.
+            </p>
+        </div>
+    </div>
+
+    <h2 class="mb-4 text-center">Nuestra Contribución</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+        <!-- guortun- -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">guortun-</h3>
+                    <p class="card-text">
+                        Con un enfoque en la arquitectura técnica, guortun- aportó experiencia en el desarrollo de los componentes <strong>backend</strong> y <strong>frontend</strong>, así como en la implementación del <strong>juego</strong> y la gestión de <strong>bases de datos</strong>, asegurando una integración fluida y eficiente.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <!-- bazuara -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">bazuara</h3>
+                    <p class="card-text">
+                        Especializado en infraestructura, bazuara contribuyó significativamente al entorno de <strong>DevOps</strong>, implementando soluciones de <strong>monitoreo</strong>, <strong>Docker</strong>, <strong>devcontainers</strong> y <strong>microservicios</strong>, garantizando un despliegue estable y escalable.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <!-- agserran -->
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">agserran</h3>
+                    <p class="card-text">
+                        Con un enfoque meticuloso, agserran desempeñó un rol clave en la <strong>resolución de errores</strong>, optimizando la funcionalidad y estabilidad del sistema a través de una atención precisa a los detalles técnicos.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-3 text-center">Nuestra Visión</h2>
+            <p class="text-center">
+                Este proyecto representa una oportunidad única para explorar las posibilidades de la tecnología en un entorno colaborativo. Inspirados por nuestra pasión por la <strong>administración de sistemas</strong>, hemos trabajado en equipo para superar desafíos técnicos y entregar una solución que refleja nuestro compromiso con la calidad. Completar esta iniciativa como parte del <em>Common Core</em> de 42 Madrid nos llena de satisfacción y nos motiva a seguir creciendo como profesionales.
+            </p>
+        </div>
+    </div>
+
+    <!-- Botón "Volver al Inicio" con estilo SPA -->
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">Volver</h3>
+                    <p class="card-text">Regresa a la página principal.</p>
+                    <a href="{% url 'home' %}"
+                       class="btn btn-primary btn-lg"
+                       hx-get="{% url 'home' %}"
+                       hx-target="#content"
+                       hx-push-url="true">Volver al Inicio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-Testing bootstrap5 instalation
-<br>
-<br>
-<button type="button" class="btn btn-primary">Primary</button>
-<button type="button" class="btn btn-secondary">Secondary</button>
-<button type="button" class="btn btn-success">Success</button>
-<button type="button" class="btn btn-danger">Danger</button>
-<button type="button" class="btn btn-warning">Warning</button>
-<button type="button" class="btn btn-info">Info</button>
-<button type="button" class="btn btn-light">Light</button>
-<button type="button" class="btn btn-dark">Dark</button>
-<br>
-<br>
-<button type="button" class="btn btn-outline-primary">Primary</button>
-<button type="button" class="btn btn-outline-secondary">Secondary</button>
-<button type="button" class="btn btn-outline-success">Success</button>
-<button type="button" class="btn btn-outline-danger">Danger</button>
-<button type="button" class="btn btn-outline-warning">Warning</button>
-<button type="button" class="btn btn-outline-info">Info</button>
-<button type="button" class="btn btn-outline-light">Light</button>
-<button type="button" class="btn btn-outline-dark">Dark</button>
-<br>
-<br>
-<div class="dropdown">
-    <button class="btn btn-secondary dropdown-toggle"
-            type="button"
-            id="dropdownMenuButton1"
-            data-bs-toggle="dropdown"
-            aria-expanded="false">Dropdown button</button>
-    <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-        <li>
-            <a class="dropdown-item" href="#">Action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Another action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Something else here</a>
-        </li>
-    </ul>
-</div>
-<br>
-<br>
-<!-- Example single danger button -->
-<div class="btn-group">
-    <button type="button"
-            class="btn btn-danger dropdown-toggle"
-            data-bs-toggle="dropdown"
-            aria-expanded="false">Action</button>
-    <ul class="dropdown-menu">
-        <li>
-            <a class="dropdown-item" href="#">Action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Another action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Something else here</a>
-        </li>
-        <li>
-            <hr class="dropdown-divider">
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Separated link</a>
-        </li>
-    </ul>
-</div>
-<br>
-<br>
-<!-- Example split danger button -->
-<div class="btn-group">
-    <button type="button" class="btn btn-danger">Action</button>
-    <button type="button"
-            class="btn btn-danger dropdown-toggle dropdown-toggle-split"
-            data-bs-toggle="dropdown"
-            aria-expanded="false">
-        <span class="visually-hidden">Toggle Dropdown</span>
-    </button>
-    <ul class="dropdown-menu">
-        <li>
-            <a class="dropdown-item" href="#">Action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Another action</a>
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Something else here</a>
-        </li>
-        <li>
-            <hr class="dropdown-divider">
-        </li>
-        <li>
-            <a class="dropdown-item" href="#">Separated link</a>
-        </li>
-    </ul>
-</div>
+
+<style>
+    .about-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .about-container h1 {
+        font-size: 2.5rem;
+        color: #333;
+    }
+
+    .about-container h2 {
+        font-size: 1.8rem;
+        color: #333;
+    }
+
+    .about-container .lead {
+        font-size: 1.25rem;
+        color: #555;
+    }
+
+    .about-container .card {
+        border: none;
+        transition: transform 0.2s;
+    }
+
+    .about-container .card:hover {
+        transform: translateY(-5px);
+    }
+
+    .about-container .card-title {
+        font-size: 1.5rem;
+        color: #007bff;
+    }
+
+    .about-container .card-text {
+        font-size: 1rem;
+        color: #555;
+    }
+
+    @media (max-width: 768px) {
+        .about-container h1 {
+            font-size: 2rem;
+        }
+
+        .about-container h2 {
+            font-size: 1.5rem;
+        }
+
+        .about-container .lead {
+            font-size: 1.1rem;
+        }
+
+        .about-container .card-title {
+            font-size: 1.3rem;
+        }
+
+        .about-container .card-text {
+            font-size: 0.95rem;
+        }
+    }
+</style>

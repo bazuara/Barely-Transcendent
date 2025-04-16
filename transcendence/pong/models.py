@@ -1,5 +1,22 @@
 from django.db import models
-from users.models import User  # Importa tu modelo personalizado de usuario
+from users.models import User
+
+class History(models.Model):
+    room_id = models.CharField(max_length=100)  # ID de la partida
+    player1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history_as_player1')
+    player2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history_as_player2')
+    player1_score = models.IntegerField(default=0)  # Puntuación del jugador 1
+    player2_score = models.IntegerField(default=0)  # Puntuación del jugador 2
+    winner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history_winner', null=True, blank=True)  # Ganador, puede ser nulo si no hay ganador
+    timestamp = models.DateTimeField(auto_now_add=True)  # Fecha y hora de la partida
+
+    def __str__(self):
+        winner_str = self.winner.intra_login if self.winner else "Sin ganador"
+        return f"Partida {self.room_id} ({self.player1.intra_login} vs {self.player2.intra_login}) - Ganador: {winner_str}"
+
+    class Meta:
+        ordering = ['-timestamp']  # Ordenar por timestamp descendente (más reciente primero)
+
 
 class Game(models.Model):
     # Identificador único de la partida (se genera automáticamente)

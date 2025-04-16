@@ -5,7 +5,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 from users.views import login, oauth_callback, logout, profile, update_profile, mock_login, anonimize
 
-
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login, name='login'),
@@ -18,6 +17,7 @@ urlpatterns = [
     path('pong/', views.pong, name='pong'),
     path('tournament/', views.tournament, name='tournament'),
     path('mock-login/<str:username>/', mock_login, name='mock_login'),
+    path('history/', views.history, name='history'), 
     path('profile/anonimize/', anonimize, name='anonimize'),
     path("prometheus/", include("django_prometheus.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
