@@ -23,6 +23,13 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
+                       href="{% url 'history' %}"
+                       hx-get="{% url 'history' %}"
+                       hx-target="#content"
+                       hx-push-url="true">History</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
                        href="{% url 'about' %}"
                        hx-get="{% url 'about' %}"
                        hx-target="#content"
@@ -30,10 +37,10 @@
                 </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle d-flex align-items-center" 
-                    href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                       href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         {% if user.intra_picture %}
                         <img src="{{ user.intra_picture }}" alt="{{ user.intra_login }}" 
-                        class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
+                             class="rounded-circle me-2" style="width: 30px; height: 30px; object-fit: cover;">
                         {% endif %}
                         <span>{{ user.intra_login }}</span>
                     </a>

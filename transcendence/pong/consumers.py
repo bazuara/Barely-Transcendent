@@ -5,7 +5,7 @@ import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from users.models import User
-from pong.models import Game
+from pong.models import Game, History
 from urllib import parse
 from web3 import Web3
 
@@ -353,14 +353,32 @@ class PongConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_game_results(self, room_id, game_data):
-        """Guarda los resultados de la partida."""
+        """Guarda los resultados de la partida en los modelos Game y History."""
         game = Game.objects.filter(room_id=room_id).first()
         if game:
             game.player1_score = game_data['player1_score']
             game.player2_score = game_data['player2_score']
             game.is_active = False
             game.save()
-            print(f"[DEBUG] Resultados guardados para {room_id}")
+            print(f"[DEBUG] Resultados guardados para {room_id} en Game")
+
+            # Determinar el ganador
+            winner = None
+            if game_data['player1_score'] >= 3:
+                winner = User.objects.get(internal_id=game_data['player1_id'])
+            elif game_data['player2_score'] >= 3:
+                winner = User.objects.get(internal_id=game_data['player2_id'])
+
+            # Guardar en el modelo History
+            History.objects.create(
+                room_id=room_id,
+                player1=User.objects.get(internal_id=game_data['player1_id']),
+                player2=User.objects.get(internal_id=game_data['player2_id']),
+                player1_score=game_data['player1_score'],
+                player2_score=game_data['player2_score'],
+                winner=winner
+            )
+            print(f"[DEBUG] Historial guardado para {room_id} en History")
 
     @database_sync_to_async
     def get_user_info(self, user_id):
@@ -458,7 +476,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
     async def start_tournament(self, event):
         # Ignorar el mensaje en el backend, ya que lo maneja el frontend
         print(
-            f"[DEBUG] Mensaje start_tournament recibido en backend y ignorado: {event}")
+            f"[DEBUG] Mensaje start_tournament recibido en backend e ignorado: {event}")
         pass
 
     async def disconnect(self, close_code):
