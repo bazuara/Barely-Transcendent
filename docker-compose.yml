@@ -63,6 +63,13 @@ services:
       - "3000:3000"
     networks:
       - barely_a_network
+    env_file:
+      - .env
+    environment:
+      - GF_SERVER_ROOT_URL=${CAMPUS_HOST}/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATHS=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+
     depends_on:
       - prometheus
 
@@ -106,6 +113,25 @@ services:
       - HOST=${TRUFFLE_HOST}
       - PORT=${TRUFFLE_PORT}
       - NETWORK_ID=${TRUFFLE_NETWORK_ID}
+
+  nginx:
+    image: nginx:1.25
+    container_name: nginx
+    entrypoint: ["/bin/sh", "-c", "/entrypoint.sh"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
+      - ./nginx/certs:/etc/nginx/certs
+      - ./.env:/app/.env:ro
+    working_dir: /app
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - django
+      - grafana
+    networks:
+      - barely_a_network
 
 networks:
   barely_a_network:
