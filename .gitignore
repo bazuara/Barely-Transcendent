@@ -3,3 +3,4 @@ transcendence/staticfiles/
 **/contract_address.txt
 **/Tournament.json
 nginx/certs/
+transcendence/media/profile_pictures/
