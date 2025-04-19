@@ -23,10 +23,31 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
+                          href="{% url 'pong' %}"
+                            hx-get="{% url 'pong' %}"
+                            hx-target="#content"
+                            hx-push-url="true">Pong</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                          href="{% url 'tournament' %}"
+                          hx-get="{% url 'tournament' %}"
+                          hx-target="#content"
+                          hx-push-url="true">Tournament</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
                        href="{% url 'history' %}"
                        hx-get="{% url 'history' %}"
                        hx-target="#content"
                        hx-push-url="true">History</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                       href="{% url 'tournament_history' %}"
+                       hx-get="{% url 'tournament_history' %}"
+                       hx-target="#content"
+                       hx-push-url="true">Tournament History</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
