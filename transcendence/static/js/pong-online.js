@@ -181,7 +181,7 @@
             console.log("[DEBUG] Ya existe una conexión WebSocket activa, cerrándola primero");
             socket.close();
         }
-        const wsUrl = `ws://${window.location.host}/ws/pong/`;
+        const wsUrl = `wss://${window.location.host}/ws/pong/`;
         console.log(`[DEBUG] Conectando a WebSocket: ${wsUrl}`);
         socket = new WebSocket(wsUrl);
         socket.onopen = function(event) {

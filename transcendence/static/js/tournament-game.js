@@ -198,7 +198,7 @@
     }
 
     function connectWebSocket() {
-        const wsUrl = `ws://${window.location.host}/ws/tournament-match/${matchId}/`;
+        const wsUrl = `wss://${window.location.host}/ws/tournament-match/${matchId}/`;
         socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
