@@ -17,7 +17,8 @@ urlpatterns = [
     path('pong/', views.pong, name='pong'),
     path('tournament/', views.tournament, name='tournament'),
     path('mock-login/<str:username>/', mock_login, name='mock_login'),
-    path('history/', views.history, name='history'), 
+    path('history/', views.history, name='history'),
+    path('tournament-history/', views.tournament_history, name='tournament_history'),
     path('profile/anonimize/', anonimize, name='anonimize'),
     path("prometheus/", include("django_prometheus.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
