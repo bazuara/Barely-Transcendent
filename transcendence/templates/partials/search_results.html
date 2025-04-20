@@ -1,0 +1,70 @@
+{% if users %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th scope="col">Foto</th>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for search_user in users %}
+                    <!-- Depuración del internal_id -->
+                    {% if search_user.internal_id %}
+                        <tr data-user-id="{{ search_user.internal_id }}">
+                            <td>
+                                <img src="{% if search_user.internal_picture %}{{ search_user.internal_picture.url }}?v={{ cache_bust }}{% else %}{{ search_user.intra_picture|default:'/static/default-avatar.png' }}{% endif %}" 
+                                     alt="{{ search_user.internal_login }}" 
+                                     class="rounded-circle" 
+                                     style="width: 50px; height: 50px;">
+                            </td>
+                            <td>
+                                {% if search_user.intra_login == "ANONYMOUS" %}
+                                    {{ search_user.intra_login }}
+                                {% elif search_user.internal_login %}
+                                    {{ search_user.internal_login }}
+                                {% else %}
+                                    {{ search_user.intra_login }}
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">{{ search_user.intra_name }} {{ search_user.intra_surname }}</small>
+                            </td>
+                            <td class="user-status">
+                                <span class="status-indicator">Offline</span>
+                            </td>
+                            <td>
+                                {% if user and search_user not in user.friends.all %}
+                                    <form hx-post="{% url 'search_users' %}" hx-target="#search-results" hx-swap="innerHTML">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="friend_id" value="{{ search_user.internal_id }}">
+                                        <input type="hidden" name="q" value="{{ query }}">
+                                        <button type="submit" name="add_friend" class="btn btn-success btn-sm">Añadir amigo</button>
+                                    </form>
+                                {% elif user %}
+                                    <form hx-post="{% url 'search_users' %}" hx-target="#search-results" hx-swap="innerHTML">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="friend_id" value="{{ search_user.internal_id }}">
+                                        <input type="hidden" name="q" value="{{ query }}">
+                                        <button type="submit" name="remove_friend" class="btn btn-danger btn-sm">Eliminar amigo</button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inicia sesión</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4">
+                                <p class="text-muted text-center">Usuario sin internal_id: {{ search_user.intra_login }}</p>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% elif query %}
+    <p class="text-muted text-center mt-3">No se encontraron usuarios.</p>
+{% endif %}

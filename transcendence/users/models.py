@@ -23,6 +23,9 @@ class User(models.Model):
     user_creation = models.DateTimeField(auto_now_add=True)
     last_online = models.DateTimeField(default=timezone.now)
 
+    # Friends field
+    friends = models.ManyToManyField('self', symmetrical=True, blank=True)
+
     # Campos para estadísticas del juego
     games_played = models.IntegerField(default=0)
     games_won = models.IntegerField(default=0)
@@ -32,7 +35,7 @@ class User(models.Model):
         return str(self.intra_id)
 
     def anonimize(self):
-        # Eliminar la imagen física si existe
+        # Eliminar la imagen interna si existe
         if self.internal_picture:
             if os.path.isfile(self.internal_picture.path):
                 os.remove(self.internal_picture.path)

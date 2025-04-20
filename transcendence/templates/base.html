@@ -26,9 +26,7 @@
                 }
               });
             });
-          </script>
-          
-
+        </script>
         {% block extra_head %}{% endblock %}
     </head>
     <body class="d-flex flex-column min-vh-100">
@@ -41,6 +39,118 @@
         </main>
         <!-- Cargar el Footer desde un partial -->
         {% include "partials/footer.html" %}
-        {% block extra_scripts %}{% endblock %}
+        {% block extra_scripts %}
+            <!-- Script para abrir WebSocket -->
+            <script>
+                // Variable global para almacenar el estado de los usuarios
+                window.onlineUsers = new Set();
+
+                // Función para conectar al WebSocket
+                function connectWebSocket() {
+                    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+                    const wsUrl = `${protocol}${window.location.host}/ws/status/`;
+                    const ws = new WebSocket(wsUrl);
+
+                    ws.onopen = function() {
+                        console.log("WebSocket conectado");
+                        ws.send(JSON.stringify({
+                            type: "request_all_users_status"
+                        }));
+                    };
+
+                    ws.onmessage = function(event) {
+                        const data = JSON.parse(event.data);
+                        console.log("Mensaje recibido del WebSocket:", data);
+
+                        if (data.type === "all_users_status") {
+                            window.onlineUsers = new Set(data.users_status.map(Number));
+                            console.log("Usuarios online (all_users_status):", Array.from(window.onlineUsers));
+                            updateAllUsersStatus();
+                        } else if (data.type === "user_status") {
+                            const userId = Number(data.user_id);
+                            if (data.status === "online") {
+                                window.onlineUsers.add(userId);
+                            } else {
+                                window.onlineUsers.delete(userId);
+                            }
+                            console.log(`Usuario ${userId} ahora está ${data.status}`);
+                            console.log("Usuarios online (user_status):", Array.from(window.onlineUsers));
+                            updateAllUsersStatus();
+                        }
+                    };
+
+                    ws.onclose = function(event) {
+                        console.log("WebSocket desconectado, intentando reconectar...", event);
+                        setTimeout(connectWebSocket, 5000);
+                    };
+
+                    ws.onerror = function(error) {
+                        console.error("Error en WebSocket:", error);
+                    };
+
+                    window.statusWebSocket = ws;
+                }
+
+                // Función para actualizar el estado de un usuario en la tabla
+                function updateUserStatus(userId, status) {
+                    const row = document.querySelector(`tr[data-user-id="${userId}"]`);
+                    if (row) {
+                        const statusCell = row.querySelector('.user-status .status-indicator');
+                        if (statusCell) {
+                            statusCell.textContent = status === 'online' ? 'Online' : 'Offline';
+                            statusCell.classList.remove('text-success', 'text-muted');
+                            statusCell.classList.add(status === 'online' ? 'text-success' : 'text-muted');
+                            console.log(`Actualizado usuario ${userId} a ${status}`);
+                        } else {
+                            console.log(`No se encontró statusCell para userId ${userId}`);
+                        }
+                    } else {
+                        console.log(`No se encontró fila para userId ${userId}`);
+                    }
+                }
+
+                // Función para actualizar el estado de todos los usuarios en la tabla
+                function updateAllUsersStatus() {
+                    console.log("Actualizando todos los estados...");
+                    console.log("window.onlineUsers:", Array.from(window.onlineUsers));
+                    document.querySelectorAll('tr[data-user-id]').forEach(row => {
+                        const userId = parseInt(row.getAttribute('data-user-id'));
+                        console.log(`Procesando userId ${userId}, tipo: ${typeof userId}`);
+                        if (isNaN(userId)) {
+                            console.log(`userId ${userId} no es un número válido`);
+                            return;
+                        }
+                        const status = window.onlineUsers.has(userId) ? 'online' : 'offline';
+                        updateUserStatus(userId, status);
+                    });
+                }
+
+                // Iniciar la conexión WebSocket solo si el usuario está autenticado
+                document.addEventListener("DOMContentLoaded", function() {
+                    const userId = "{{ user.internal_id|default_if_none:'' }}";
+                    if (userId) {
+                        console.log("Usuario autenticado, conectando al WebSocket...");
+                        connectWebSocket();
+                    } else {
+                        console.log("Usuario no autenticado, no se conectará al WebSocket.");
+                    }
+
+                    // Actualizar estados después de que HTMX recargue el contenido
+                    document.addEventListener("htmx:afterSettle", function(event) {
+                        console.log("Evento htmx:afterSettle disparado para:", event.target.id);
+                        if (event.target.id === "search-results") {
+                            updateAllUsersStatus();
+                        }
+                    });
+                });
+
+                // Cerrar el WebSocket al cerrar la página (opcional)
+                window.addEventListener("beforeunload", function() {
+                    if (window.statusWebSocket) {
+                        window.statusWebSocket.close();
+                    }
+                });
+            </script>
+        {% endblock %}
     </body>
 </html>

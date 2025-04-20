@@ -51,6 +51,13 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
+                       href="{% url 'search.html' %}"
+                       hx-get="{% url 'search.html' %}"
+                       hx-target="#content"
+                       hx-push-url="true">Search</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
                        href="{% url 'about' %}"
                        hx-get="{% url 'about' %}"
                        hx-target="#content"

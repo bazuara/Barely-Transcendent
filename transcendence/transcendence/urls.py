@@ -10,6 +10,7 @@ urlpatterns = [
     path('', login, name='login'),
     path('oauth/callback', oauth_callback, name='oauth_callback'),
     path('home/', views.home, name='home'),
+    path('search/', views.search_users, name='search_users'),  # New URL for search
     path('about/', views.about, name='about'),
     path('logout/', logout, name='logout'),
     path('profile/', profile, name='profile'),
