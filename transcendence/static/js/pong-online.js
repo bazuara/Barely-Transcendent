@@ -1,4 +1,3 @@
-// static/js/pong-online.js
 (() => {
     let canvas, ctx;
     let myPaddleY = 0.5;
@@ -181,7 +180,7 @@
             console.log("[DEBUG] Ya existe una conexión WebSocket activa, cerrándola primero");
             socket.close();
         }
-        const wsUrl = `ws://${window.location.host}/ws/pong/`;
+        const wsUrl = `wss://${window.location.host}/ws/pong/`;
         console.log(`[DEBUG] Conectando a WebSocket: ${wsUrl}`);
         socket = new WebSocket(wsUrl);
         socket.onopen = function(event) {
@@ -486,6 +485,23 @@
         let myScore = myPlayerNumber === 1 ? player1Score : player2Score;
         let opponentScore = myPlayerNumber === 1 ? player2Score : player1Score;
     }
+
+    // Detectar cambios de ruta con popstate
+    window.addEventListener('popstate', async () => {
+        console.log("[DEBUG] Cambio de ruta detectado, limpiando WebSocket...");
+        await cleanupOnlineGame();
+    });
+
+    // Sobreescribir pushState para detectar cambios de ruta manuales
+    (function(history) {
+        const pushState = history.pushState;
+        history.pushState = function(state, title, url) {
+            console.log("[DEBUG] pushState llamado, limpiando WebSocket...");
+            cleanupOnlineGame().then(() => {
+                return pushState.apply(history, arguments);
+            });
+        };
+    })(window.history);
 
     window.initOnlineGame = initOnlineGame;
     window.cleanupOnlineGame = cleanupOnlineGame;
