@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.contrib.auth import login as auth_login
 import os
 import time
+from django.db.models import Q
 
 
 def profile(request):
@@ -174,3 +175,90 @@ def anonimize(request):
 
     request.session.flush()
     return redirect('login')
+
+def search_users(request):
+    # Validar usuario mediante sesión
+    user_id = request.session.get('user_id')
+    user = None
+    if user_id:
+        try:
+            user = User.objects.get(internal_id=user_id)
+            user.last_online = timezone.now()
+            user.save()
+        except User.DoesNotExist:
+            request.session.flush()
+            return redirect('login')
+    
+    # Procesar búsqueda
+    query = request.GET.get('q', '')
+    users = []
+    if query:
+        try:
+            users = User.objects.filter(
+                Q(intra_login__icontains=query) | 
+                Q(internal_login__icontains=query) | 
+                Q(intra_name__icontains=query) | 
+                Q(intra_surname__icontains=query)
+            ).exclude(intra_login="ANONYMOUS")
+            if user:
+                users = users.exclude(internal_id=user.internal_id)[:10]
+            else:
+                users = users[:10]
+        except Exception as e:
+            print(f"Error en la búsqueda: {e}")
+            return HttpResponse("Error en la búsqueda", status=500)
+    
+    # Procesar solicitud de añadir o eliminar amigo (HTMX)
+    if request.htmx and request.POST:
+        if not user:
+            return HttpResponse('<div class="alert alert-danger">Debes iniciar sesión para gestionar amigos</div>')
+        friend_id = request.POST.get('friend_id')
+        query = request.POST.get('q', '')  # Mantener el query para la búsqueda
+        try:
+            friend = User.objects.get(internal_id=friend_id)
+            if 'add_friend' in request.POST:
+                user.friends.add(friend)
+                message = '<div class="alert alert-success">Amigo añadido correctamente</div>'
+            elif 'remove_friend' in request.POST:
+                user.friends.remove(friend)
+                message = '<div class="alert alert-success">Amigo eliminado correctamente</div>'
+            else:
+                return HttpResponse('<div class="alert alert-danger">Acción no válida</div>')
+            
+            # Re-renderizar los resultados después de añadir/eliminar amigo
+            users = User.objects.filter(
+                Q(intra_login__icontains=query) | 
+                Q(intra_login__icontains=query) | 
+                Q(intra_name__icontains=query) | 
+                Q(intra_surname__icontains=query)
+            ).exclude(intra_login="ANONYMOUS")
+            if user:
+                users = users.exclude(internal_id=user.internal_id)[:10]
+            context = {
+                'user': user,
+                'users': users,
+                'query': query,
+                'cache_bust': int(time.time())
+            }
+            response = render(request, 'partials/search_results.html', context)
+            # Añadir el mensaje de éxito al final del contenido
+            response.content = response.content + message.encode()
+            return response
+        except User.DoesNotExist:
+            return HttpResponse('<div class="alert alert-danger">Usuario no encontrado</div>')
+    
+    # Seleccionar plantilla según HTMX
+    if request.htmx:
+        template = 'partials/search_results.html'
+    else:
+        template = "search.html"
+    
+    # Preparar contexto
+    context = {
+        'user': user,
+        'users': users,
+        'query': query,
+        'cache_bust': int(time.time())
+    }
+    
+    return render(request, template, context)
