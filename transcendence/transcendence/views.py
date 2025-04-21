@@ -6,6 +6,8 @@ import time
 from django.core.paginator import Paginator
 from web3 import Web3
 import json
+from django.http import HttpResponse
+from django.db.models import Q
 
 # Configuración de la blockchain
 ganache_url = "http://ganache:8545"
@@ -162,3 +164,4 @@ def tournament_history(request):
     }
     template = "partials/tournament_history.html" if request.htmx else "tournament_history.html"
     return render(request, template, context)
+

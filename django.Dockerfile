@@ -30,4 +30,4 @@ RUN pip install -r requirements.txt
 # Set the working directory
 WORKDIR /app
 # run server with python -m daphne -b 0.0.0.0 -p 8000 transcendence.asgi:application
-CMD ["sh", "-c", "python transcendence/manage.py migrate && python transcendence/manage.py collectstatic --noinput && cd transcendence && python -m daphne -b 0.0.0.0 -p 8000 transcendence.asgi:application"]
+CMD ["sh", "-c", "python transcendence/manage.py makemigrations && python transcendence/manage.py migrate && python transcendence/manage.py collectstatic --noinput && cd transcendence && python -m daphne -b 0.0.0.0 -p 8000 transcendence.asgi:application"]

@@ -1,4 +1,4 @@
-Django==5.1.6
+Django==4.2.19
 autopep8==2.3.2
 pylint==3.3.4
 psycopg2-binary==2.9.10

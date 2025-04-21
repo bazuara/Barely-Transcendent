@@ -128,8 +128,7 @@ services:
       - media-data:/media:ro
     working_dir: /app
     ports:
-      - "80:80"
-      - "443:443"
+      - "1443:1443"
     depends_on:
       - django
       - grafana
