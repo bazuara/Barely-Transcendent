@@ -102,7 +102,7 @@
         opponentId = opponentIdParam;
         myId = userIdParam || myId;
         gameInitialized = true;
-    
+
         // Ocultar la sala del torneo
         const tournamentContainer = document.getElementById('tournament-container');
         if (tournamentContainer) {
@@ -110,7 +110,7 @@
         } else {
             console.warn("[WARNING] No se encontró #tournament-container");
         }
-    
+
         // Mostrar el contenedor del juego
         const gameContainer = document.getElementById('game-container');
         if (gameContainer) {
@@ -119,7 +119,7 @@
             console.error("[ERROR] No se encontró #game-container");
             return;
         }
-    
+
         canvas = document.getElementById('pong-canvas');
         if (!canvas) {
             console.error("[ERROR] No se encontró el elemento canvas 'pong-canvas'");
@@ -139,17 +139,21 @@
         targetOpponentPaddleY = 0.5;
         myScore = 0;
         opponentScore = 0;
-    
+
         keysPressed = {};
         window.keydownHandler = (event) => {
             keysPressed[event.key] = true;
+            // Prevenir el comportamiento predeterminado de las flechas arriba y abajo
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+            }
         };
         window.keyupHandler = (event) => {
             keysPressed[event.key] = false;
         };
         window.addEventListener('keydown', window.keydownHandler);
         window.addEventListener('keyup', window.keyupHandler);
-    
+
         paddleMoveInterval = setInterval(() => {
             if (!gameInitialized) return;
             const paddleStep = 0.025;
@@ -166,7 +170,7 @@
                 sendPaddleMovement();
             }
         }, 20);
-    
+
         const player1Name = document.getElementById('player1-name');
         const player2Name = document.getElementById('player2-name');
         const player1Avatar = document.getElementById('player1-avatar');
@@ -179,7 +183,7 @@
             player1Avatar.style.display = 'inline';
             player2Avatar.style.display = 'inline';
         }
-    
+
         showWaitingMessage();
         connectWebSocket();
     }
@@ -242,15 +246,15 @@
             console.log("[DEBUG] Inicio de partida recibido, asignando jugadores y comenzando gameLoop");
             const gameMessage = document.getElementById('game-message');
             if (gameMessage) gameMessage.classList.add('d-none');
-            
+
             myPlayerNumber = myId === data.player1.user_id ? 1 : 2;
             console.log("[DEBUG] Asignado como jugador:", myPlayerNumber);
-    
+
             myName = data.player1.user_id === myId ? data.player1.intra_login : data.player2.intra_login;
             myAvatar = data.player1.user_id === myId ? data.player1.intra_picture : data.player2.intra_picture;
             opponentName = data.player1.user_id === myId ? data.player2.intra_login : data.player1.intra_login;
             opponentAvatar = data.player1.user_id === myId ? data.player2.intra_picture : data.player1.intra_picture;
-    
+
             const player1Name = document.getElementById('player1-name');
             const player2Name = document.getElementById('player2-name');
             const player1Avatar = document.getElementById('player1-avatar');
@@ -261,13 +265,13 @@
                 player1Avatar.src = myAvatar || '/static/default-avatar.png';
                 player2Avatar.src = opponentAvatar || '/static/default-avatar.png';
             }
-    
+
             if (!animationFrameId) {
                 console.log("[DEBUG] Iniciando gameLoop");
                 animationFrameId = requestAnimationFrame(gameLoop);
             }
         }
-    
+
         if (data.type === 'update_ball') {
             if (myPlayerNumber === 1) {
                 targetBallX = data.ball_position_x;
@@ -277,7 +281,7 @@
                 targetBallY = data.ball_position_y;
             }
         }
-    
+
         if (data.type === 'update_paddle') {
             if (myPlayerNumber === 1) {
                 targetOpponentPaddleY = data.right_paddle; // Oponente está a la derecha
@@ -286,7 +290,7 @@
             }
             console.log("[DEBUG] Actualizando paleta oponente a:", targetOpponentPaddleY);
         }
-    
+
         if (data.type === 'update_score') {
             if (myPlayerNumber === 1) {
                 myScore = data.player1_score;
@@ -313,10 +317,10 @@
             const winnerIdStr = data.winner === 1 ? player1IdStr : player2IdStr;
             const isWinner = myIdStr === winnerIdStr;
             console.log("[DEBUG] Calculando isWinner - myId:", myIdStr, "winner:", data.winner, "player1_id:", player1IdStr, "player2_id:", player2IdStr, "isWinner:", isWinner);
-            
+
             // Usar data.message si existe, o fallback según isWinner
             const winnerMessage = data.message || (isWinner ? '¡Victoria!' : 'Has perdido');
-        
+
             if (gameMessage) {
                 gameMessage.innerHTML = `
                     <h3 class="text-center">¡Fin de la partida!</h3>
@@ -325,13 +329,13 @@
                 `;
                 gameMessage.classList.remove('d-none');
             }
-        
+
             gameInitialized = false;
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
             }
-        
+
             const gameContainer = document.getElementById('game-container');
             const tournamentContainer = document.getElementById('tournament-container');
             if (gameContainer) {
@@ -385,24 +389,24 @@
         if (!canvas) return;
         const container = canvas.parentElement;
         if (!container) return;
-    
+
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         const aspectRatio = 2 / 1;
         const dpr = window.devicePixelRatio || 1; // Densidad de píxeles
-    
+
         canvas.style.width = `${containerWidth}px`;
         canvas.style.height = `${containerWidth / aspectRatio}px`;
         canvas.width = containerWidth * dpr;
         canvas.height = (containerWidth / aspectRatio) * dpr;
-    
+
         if (canvas.height > containerHeight) {
             canvas.style.height = `${containerHeight}px`;
             canvas.style.width = `${containerHeight * aspectRatio}px`;
             canvas.width = containerHeight * aspectRatio * dpr;
             canvas.height = containerHeight * dpr;
         }
-    
+
         ctx.scale(dpr, dpr); // Escala el contexto para alta resolución
     }
 

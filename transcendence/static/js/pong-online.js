@@ -127,17 +127,21 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         keysPressed = {};
-        window.addEventListener('keydown', function(event) {
+        window.addEventListener('keydown', function (event) {
             keysPressed[event.key] = true;
+            // Prevenir el comportamiento predeterminado de las flechas arriba y abajo
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                event.preventDefault();
+            }
         });
-        window.addEventListener('keyup', function(event) {
+        window.addEventListener('keyup', function (event) {
             keysPressed[event.key] = false;
         });
         if (paddleMoveInterval) {
             clearInterval(paddleMoveInterval);
             paddleMoveInterval = null;
         }
-        paddleMoveInterval = setInterval(function() {
+        paddleMoveInterval = setInterval(function () {
             if (isWaitingForOpponent) return;
             const paddleStep = 0.025;
             let hasMoved = false;
@@ -183,9 +187,9 @@
         const wsUrl = `wss://${window.location.host}/ws/pong/`;
         console.log(`[DEBUG] Conectando a WebSocket: ${wsUrl}`);
         socket = new WebSocket(wsUrl);
-        socket.onopen = function(event) {
+        socket.onopen = function (event) {
             console.log("[DEBUG] Conexión WebSocket abierta.");
-            setTimeout(function() {
+            setTimeout(function () {
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     console.log("[DEBUG] Enviando solicitud de emparejamiento...");
                     socket.send(JSON.stringify({
@@ -195,12 +199,12 @@
                 }
             }, 100);
         };
-        socket.onmessage = function(event) {
+        socket.onmessage = function (event) {
             console.log("[DEBUG] Mensaje recibido del servidor:", event.data);
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         };
-        socket.onclose = function(event) {
+        socket.onclose = function (event) {
             console.log("[DEBUG] Conexión WebSocket cerrada. Código:", event.code);
             if (!event.wasClean) {
                 const gameMessage = document.getElementById('game-message');
@@ -213,7 +217,7 @@
                 }
             }
         };
-        socket.onerror = function(error) {
+        socket.onerror = function (error) {
             console.error("[DEBUG] Error en la conexión WebSocket:", error);
         };
     }
@@ -223,10 +227,10 @@
         const player1Avatar = document.getElementById('player1-avatar');
         const player2Name = document.getElementById('player2-name');
         const player2Avatar = document.getElementById('player2-avatar');
-        
+
         let leftPlayerData = myPlayerNumber === 1 ? player1Data : player2Data; // Yo a la izquierda
         let rightPlayerData = myPlayerNumber === 1 ? player2Data : player1Data; // Oponente a la derecha
-        
+
         if (leftPlayerData && player1Name && player1Avatar) {
             player1Name.textContent = leftPlayerData.intra_login || 'Jugador ' + myPlayerNumber;
             player1Name.classList.add('text-primary');
@@ -303,12 +307,12 @@
                 break;
 
             case 'update_paddle':
-                const isMyPaddle = (playerNumber === 1 && data.player === 'player1') || 
-                                (playerNumber === 2 && data.player === 'player2');
+                const isMyPaddle = (playerNumber === 1 && data.player === 'player1') ||
+                    (playerNumber === 2 && data.player === 'player2');
                 if (isMyPaddle) {
                     if (Math.abs(myPaddleY - data.paddle_position) > 0.1) {
-                        console.log("[DEBUG] Corrigiendo desincronización de MI paleta:", 
-                                    myPaddleY, "->", data.paddle_position);
+                        console.log("[DEBUG] Corrigiendo desincronización de MI paleta:",
+                            myPaddleY, "->", data.paddle_position);
                         myPaddleY = data.paddle_position;
                     } else {
                         console.log("[DEBUG] Ignorando eco de servidor para MI paleta");
@@ -351,18 +355,18 @@
             case 'game_over':
                 console.log("[DEBUG] La partida ha terminado.", data);
                 isWaitingForOpponent = true;
-                
+
                 let gameOverMessage;
                 let winner = data.winner;
                 const iWon = winner === myPlayerNumber;
-                
-                let myName = myPlayerNumber === 1 ? 
-                    (player1Data ? player1Data.intra_login : 'Jugador 1') : 
+
+                let myName = myPlayerNumber === 1 ?
+                    (player1Data ? player1Data.intra_login : 'Jugador 1') :
                     (player2Data ? player2Data.intra_login : 'Jugador 2');
-                let opponentName = myPlayerNumber === 1 ? 
-                    (player2Data ? player2Data.intra_login : 'Jugador 2') : 
+                let opponentName = myPlayerNumber === 1 ?
+                    (player2Data ? player2Data.intra_login : 'Jugador 2') :
                     (player1Data ? player1Data.intra_login : 'Jugador 1');
-                
+
                 if (winner === 0) {
                     gameOverMessage = data.message || 'La partida ha terminado';
                 } else {
@@ -372,7 +376,7 @@
                         gameOverMessage = `¡${opponentName} ha ganado! Mejor suerte la próxima vez.`;
                     }
                 }
-                
+
                 const endGameMessage = document.getElementById('game-message');
                 if (endGameMessage) {
                     endGameMessage.innerHTML = `
@@ -382,7 +386,7 @@
                     `;
                     endGameMessage.classList.remove('d-none');
                 }
-                
+
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     let myScore = myPlayerNumber === 1 ? player1Score : player2Score;
                     socket.send(JSON.stringify({
@@ -448,7 +452,7 @@
         if (!lastFrameTime) lastFrameTime = timestamp;
         const deltaTime = Math.min(50, timestamp - lastFrameTime) / 1000;
         lastFrameTime = timestamp;
-        
+
         opponentPaddleY = lerp(opponentPaddleY, targetOpponentPaddleY, PADDLE_INTERPOLATION_SPEED * deltaTime * 60);
         onlineBallX = lerp(onlineBallX, targetBallX, BALL_INTERPOLATION_SPEED * deltaTime * 60);
         onlineBallY = lerp(onlineBallY, targetBallY, BALL_INTERPOLATION_SPEED * deltaTime * 60);
@@ -464,13 +468,13 @@
         const ballRadius = 10;
 
         ctx.fillStyle = '#00FF00';
-        ctx.fillRect(0, myPaddleY * canvas.height - paddleHeight/2, paddleWidth, paddleHeight);
-        
+        ctx.fillRect(0, myPaddleY * canvas.height - paddleHeight / 2, paddleWidth, paddleHeight);
+
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(
-            canvas.width - paddleWidth, 
-            opponentPaddleY * canvas.height - paddleHeight/2, 
-            paddleWidth, 
+            canvas.width - paddleWidth,
+            opponentPaddleY * canvas.height - paddleHeight / 2,
+            paddleWidth,
             paddleHeight
         );
 
@@ -478,7 +482,7 @@
         ctx.beginPath();
         ctx.arc(onlineBallX * canvas.width, onlineBallY * canvas.height, ballRadius, 0, Math.PI * 2);
         ctx.fill();
-        
+
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '24px Arial';
         ctx.textAlign = 'center';
@@ -493,9 +497,9 @@
     });
 
     // Sobreescribir pushState para detectar cambios de ruta manuales
-    (function(history) {
+    (function (history) {
         const pushState = history.pushState;
-        history.pushState = function(state, title, url) {
+        history.pushState = function (state, title, url) {
             console.log("[DEBUG] pushState llamado, limpiando WebSocket...");
             cleanupOnlineGame().then(() => {
                 return pushState.apply(history, arguments);
@@ -506,12 +510,12 @@
     window.initOnlineGame = initOnlineGame;
     window.cleanupOnlineGame = cleanupOnlineGame;
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         console.log("[DEBUG] DOM completamente cargado (carga inicial).");
         setupPongButtons();
     });
 
-    document.addEventListener('pongPartialLoaded', function() {
+    document.addEventListener('pongPartialLoaded', function () {
         console.log("[DEBUG] Evento pongPartialLoaded detectado, configurando botones...");
         setupPongButtons();
     });
@@ -521,7 +525,7 @@
         if (playOnlineBtn) {
             const newButton = playOnlineBtn.cloneNode(true);
             playOnlineBtn.parentNode.replaceChild(newButton, playOnlineBtn);
-            newButton.addEventListener('click', async function() {
+            newButton.addEventListener('click', async function () {
                 console.log("[DEBUG] Botón 'Jugar Online' pulsado.");
                 await cleanupOnlineGame();
                 if (typeof cleanupLocalGame === 'function') {
@@ -541,17 +545,17 @@
                     `;
                     gameMessage.classList.remove('d-none');
                 }
-                setTimeout(function() {
+                setTimeout(function () {
                     initOnlineGame();
                 }, 50);
             });
         }
-        
+
         const playLocalBtn = document.getElementById('play-local-btn');
         if (playLocalBtn) {
             const newButton = playLocalBtn.cloneNode(true);
             playLocalBtn.parentNode.replaceChild(newButton, playLocalBtn);
-            newButton.addEventListener('click', async function() {
+            newButton.addEventListener('click', async function () {
                 console.log("[DEBUG] Botón 'Jugar Local' pulsado.");
                 await cleanupOnlineGame();
                 const gameContainer = document.getElementById('game-container');
@@ -566,7 +570,7 @@
                     `;
                     gameMessage.classList.remove('d-none');
                 }
-                setTimeout(function() {
+                setTimeout(function () {
                     if (typeof initPongGame === 'function') {
                         initPongGame();
                     } else {
