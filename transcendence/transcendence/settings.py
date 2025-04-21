@@ -38,7 +38,7 @@ OAUTH_42_CLIENT_ID = os.getenv("OAUTH_42_CLIENT_ID")
 OAUTH_42_CLIENT_SECRET = os.getenv("OAUTH_42_CLIENT_SECRET")
 # OAUTH_42_REDIRECT_URI = 'http://127.0.0.1:8000/oauth/callback'
 OAUTH_42_REDIRECT_URI = os.getenv(
-    "CAMPUS_HOST", "localhost") + '/oauth/callback'
+    "CAMPUS_HOST", "localhost") + ':1443/oauth/callback'
 OAUTH_42_AUTHORIZATION_URL = 'https://api.intra.42.fr/oauth/authorize'
 OAUTH_42_TOKEN_URL = 'https://api.intra.42.fr/oauth/token'
 OAUTH_42_API_URL = 'https://api.intra.42.fr/v2/me'
