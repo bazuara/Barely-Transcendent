@@ -41,13 +41,7 @@
             socket.close();
             socket = null;
         }
-        const gameMessage = document.getElementById('game-message');
-        if (gameMessage) {
-            gameMessage.innerHTML = `
-                <h3 class="text-center">¿Listo?</h3>
-                <p class="text-center mb-0">Presiona ESPACIO para comenzar</p>
-            `;
-        }
+
         if (paddleMoveInterval) {
             clearInterval(paddleMoveInterval);
             paddleMoveInterval = null;
