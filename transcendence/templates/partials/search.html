@@ -1,111 +1,31 @@
 <div class="container py-5">
-    <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: Arial, sans-serif;
-        }
-        .card {
-            border-radius: 10px;
-            transition: transform 0.2s;
-            border: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        .btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
-            padding: 10px 20px;
-            border-radius: 5px;
-            color: white;
-            font-weight: bold;
-        }
-        .btn-primary:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
-        }
-        .btn-success {
-            background-color: #28a745;
-            border-color: #28a745;
-            padding: 8px 16px;
-            border-radius: 5px;
-            color: white;
-        }
-        .btn-success:hover {
-            background-color: #218838;
-            border-color: #218838;
-        }
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .table th, .table td {
-            vertical-align: middle;
-            padding: 12px;
-        }
-        .table-striped tbody tr:nth-of-type(odd) {
-            background-color: rgba(0, 123, 255, 0.05);
-        }
-        .table-hover tbody tr:hover {
-            background-color: rgba(0, 123, 255, 0.1);
-        }
-        .thead-dark th {
-            background-color: #343a40;
-            color: white;
-        }
-        .rounded-circle {
-            border: 2px solid #007bff;
-            object-fit: cover;
-        }
-        .badge {
-            font-size: 0.9rem;
-            padding: 8px 16px;
-            border-radius: 20px;
-        }
-        .display-4 {
-            font-size: 2.5rem;
-            font-weight: 300;
-        }
-        .lead {
-            font-size: 1.25rem;
-            font-weight: 300;
-            color: #6c757d;
-        }
-        .text-muted {
-            color: #6c757d !important;
-        }
-        .form-control {
-            border-radius: 5px;
-            padding: 10px;
-            border: 1px solid #ced4da;
-        }
-        .form-label {
-            font-weight: bold;
-        }
-    </style>
-    <div class="row mb-4">
-        <div class="col-12 text-center">
-            <h1 class="display-4">Buscar Amigos</h1>
-            <p class="lead text-muted">Encuentra otros jugadores para añadirlos como amigos.</p>
+    <div class="container py-5">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4">Buscar Amigos</h1>
+                <p class="lead text-muted">Encuentra otros jugadores para añadirlos como amigos.</p>
+            </div>
         </div>
-    </div>
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card h-100">
-                <div class="card-body">
-                    <form hx-get="{% url 'search_users' %}" hx-target="#search-results" hx-swap="innerHTML">
-                        <div class="mb-3">
-                            <label for="searchInput" class="form-label">Buscar usuarios</label>
-                            <input type="text" class="form-control" id="searchInput" name="q" value="{{ query }}" placeholder="Nombre o login..." required>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <form hx-get="{% url 'search_users' %}" hx-target="#search-results" hx-swap="innerHTML">
+                            <div class="mb-3">
+                                <label for="searchInput" class="form-label">Buscar usuarios</label>
+                                <input type="text" class="form-control" id="searchInput" name="q" value="{{ query }}"
+                                    placeholder="Nombre o login..." required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg w-100">Buscar</button>
+                        </form>
+                        <div id="search-results" class="mt-4">
+                            {% if users and not query %}
+                            <h5 class="text-center mb-3">Tus amigos</h5>
+                            {% endif %}
+                            {% include 'partials/search_results.html' %}
                         </div>
-                        <button type="submit" class="btn btn-primary btn-lg w-100">Buscar</button>
-                    </form>
-                    <div id="search-results" class="mt-4">
-                        <!-- Resultados iniciales -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>

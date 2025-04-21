@@ -207,6 +207,12 @@ def search_users(request):
         except Exception as e:
             print(f"Error en la búsqueda: {e}")
             return HttpResponse("Error en la búsqueda", status=500)
+    elif user:  # Si no hay query y el usuario está autenticado, mostrar amigos
+        try:
+            users = user.friends.all().exclude(intra_login="ANONYMOUS")[:10]
+        except Exception as e:
+            print(f"Error al obtener amigos: {e}")
+            return HttpResponse("Error al obtener amigos", status=500)
     
     # Procesar solicitud de añadir o eliminar amigo (HTMX)
     if request.htmx and request.POST:
@@ -226,14 +232,18 @@ def search_users(request):
                 return HttpResponse('<div class="alert alert-danger">Acción no válida</div>')
             
             # Re-renderizar los resultados después de añadir/eliminar amigo
-            users = User.objects.filter(
-                Q(intra_login__icontains=query) | 
-                Q(intra_login__icontains=query) | 
-                Q(intra_name__icontains=query) | 
-                Q(intra_surname__icontains=query)
-            ).exclude(intra_login="ANONYMOUS")
-            if user:
-                users = users.exclude(internal_id=user.internal_id)[:10]
+            if query:
+                users = User.objects.filter(
+                    Q(intra_login__icontains=query) | 
+                    Q(internal_login__icontains=query) | 
+                    Q(intra_name__icontains=query) | 
+                    Q(intra_surname__icontains=query)
+                ).exclude(intra_login="ANONYMOUS")
+                if user:
+                    users = users.exclude(internal_id=user.internal_id)[:10]
+            else:
+                users = user.friends.all().exclude(intra_login="ANONYMOUS")[:10]
+            
             context = {
                 'user': user,
                 'users': users,

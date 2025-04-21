@@ -43,10 +43,10 @@ class StatusConsumer(AsyncWebsocketConsumer):
         # Aceptar la conexión WebSocket
         await self.accept()
 
-        # Marcar al usuario como online
-        await self.set_user_online(self.user_id)
+        # Incrementar el contador de conexiones y marcar como online
+        await self.increment_user_connections(self.user_id)
 
-        # Notificar a todos los clientes del grupo sobre el cambio
+        # Notificar a todos los clientes del grupo sobre el cambio (solo si pasa de offline a online)
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -60,18 +60,19 @@ class StatusConsumer(AsyncWebsocketConsumer):
         # Solo proceder si el usuario está definido
         if hasattr(self, "user_id"):
             print(f"[DEBUG] Desconexión de {self.user_id}. Código: {close_code}")
-            # Marcar al usuario como offline
-            await self.set_user_offline(self.user_id)
+            # Decrementar el contador de conexiones y verificar si se debe marcar como offline
+            should_notify_offline = await self.decrement_user_connections(self.user_id)
 
-            # Notificar a todos los clientes del grupo sobre el cambio
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    "type": "user_status_update",
-                    "user_id": self.user_id,
-                    "status": "offline"
-                }
-            )
+            if should_notify_offline:
+                # Notificar a todos los clientes del grupo sobre el cambio
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        "type": "user_status_update",
+                        "user_id": self.user_id,
+                        "status": "offline"
+                    }
+                )
 
             # Eliminar del grupo
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
@@ -97,19 +98,30 @@ class StatusConsumer(AsyncWebsocketConsumer):
         status = event["status"]
         await self.send_user_status(user_id, status)
 
-    # Métodos para manejar el estado online/offline con Redis
+    # Métodos para manejar el estado y conexiones con Redis
     @database_sync_to_async
-    def set_user_online(self, user_id):
-        # Almacenar en Redis con un TTL de 60 segundos
+    def increment_user_connections(self, user_id):
+        # Incrementar el contador de conexiones
+        key = f"user_connections:{user_id}"
+        redis_client.incr(key)
+        # Establecer un TTL para la clave (por ejemplo, 1 hora)
+        redis_client.expire(key, 3600)
+        # Marcar como online en Redis
         redis_client.setex(f"user_status:{user_id}", 60, "online")
-        # Mantener una lista de usuarios online
         redis_client.sadd("online_users", user_id)
 
     @database_sync_to_async
-    def set_user_offline(self, user_id):
-        # Eliminar el estado del usuario de Redis
-        redis_client.delete(f"user_status:{user_id}")
-        redis_client.srem("online_users", user_id)
+    def decrement_user_connections(self, user_id):
+        # Decrementar el contador de conexiones
+        key = f"user_connections:{user_id}"
+        count = redis_client.decr(key)
+        if count <= 0:
+            # Si no hay más conexiones, marcar como offline
+            redis_client.delete(f"user_status:{user_id}")
+            redis_client.srem("online_users", user_id)
+            redis_client.delete(key)  # Limpiar la clave de conexiones
+            return True
+        return False
 
     @database_sync_to_async
     def get_user_status(self, user_id):
