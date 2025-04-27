@@ -8,6 +8,26 @@
 > Repository frozen for **peer‑evaluation** at 42 Madrid Fundación Telefónica.  
 > This README details the technologies integrated and our learning journey.
 
+---
+## The Team
+
+We are three 42 Madrid students who teamed up to build this project—and to learn by doing:
+
+[**guortun-**](https://github.com/n0c3Nz) designed the overall architecture and delivered the backend, frontend, the Pong game itself and the database layer.
+
+[**bazuara**](https://github.com/bazuara) drove the DevOps and project platform: Docker containers, dev-containers, micro-service layout, the  monitoring stack and end-to-end blockchain integration.
+
+[**agserran**](https://github.com/agserran/agserran) concentrated on bug-fixing, testing and performance tuning, sharpening the system’s stability and polish.
+
+Crafting this application has deepened our skills in systems administration and collaborative development; every technical hurdle became a stepping-stone toward becoming stronger professionals.
+
+## Project management & Workflow
+
+Multiple student projects often stumble over classic pitfalls: unclear task ownership, duplicated work, merge-conflict mayhem, and last-minute rushes when no one knows what’s really “done.”.
+
+To stay ahead of these traps we ran the entire effort through a [GitHub Projects Kanban board](). Every idea or bug first became an issue with an owner, an estimate, and labels for scope (backend, DevOps, game, blockchain, docs). GitHub automations then moved cards from To-do → In Progress → Review → Done as branches and pull-requests changed state, so we always had a real-time picture of progress and bottlenecks. Branch rules enforced small, single-purpose PRs tied to their issue IDs, which slashed merge conflicts and kept code reviews focused. Burndown charts helped us spot schedule drift early, while linked Discussions captured design decisions we don’t have to rediscover our reasoning each time.
+
+You can check [contributing.md](./contributin.md), a step-by-step technical guide that shows how to spin up a dev-container, create a feature branch, and cleanly add new views to the single-page application without breaking routing or asset pipelines.
 
 ---
 
@@ -171,17 +191,4 @@ Validated on:
 > Edge hasn’t been graded but works as it users a chromium engine.
 
 ---
-
-## 12 – Team Reflection
-
-We are three 42 Madrid students who teamed up to build this project—and to learn by doing:
-
-**guortun-** designed the overall architecture and delivered the backend, frontend, the Pong game itself and the database layer.
-
-**bazuara** focused on DevOps and development platform: Docker containers, dev-containers, micro-service layout and the full monitoring stack.
-
-**agserran** concentrated on bug-fixing, testing and performance tuning, sharpening the system’s stability and polish.
-
-Crafting this application has deepened our skills in systems administration and collaborative development; every technical hurdle became a stepping-stone toward becoming stronger professionals.
-
 © 2025 – MIT License.
